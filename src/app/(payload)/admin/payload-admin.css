@@ -1,0 +1,45 @@
+/*
+ * Payload Admin complete stylesheet — ElektrK
+ *
+ * Turbopack (Next.js 16) does not collect CSS/SCSS imports from server
+ * component files. Payload's RootLayout imports individual SCSS that Turbopack
+ * silently drops. The @payloadcms/ui/dist/styles.css is also incomplete
+ * (missing :root variable definitions and many component styles).
+ *
+ * The COMPLETE production stylesheet lives at @payloadcms/next/dist/prod/styles.css
+ * (306KB) — exported as @payloadcms/next/css. It contains:
+ *   - All CSS custom properties (:root with --base, --font-body, --theme-*, --color-*)
+ *   - Color tokens and dark theme support
+ *   - Typography resets and base styles
+ *   - ALL component styles (template-minimal, field-type, form-submit, etc.)
+ *
+ * We use a relative path because CSS @import with package paths requires
+ * a "style" exports condition that the package doesn't define.
+ */
+@import "../../../../node_modules/@payloadcms/next/dist/prod/styles.css";
+
+/* ==========================================================================
+   ElektrK — Payload Admin local overrides
+   Keep all local fixes below this line so they layer over the Payload base.
+   ========================================================================== */
+
+/*
+ * Fix: nav sidebar logout/avatar stuck to viewport bottom edge.
+ *
+ * Root cause: Chrome/Edge ignore padding-bottom on flex containers with
+ * overflow-y:auto when content fills the full height. .nav__scroll has
+ * padding-bottom via --nav-padding-block-end, but that padding is swallowed
+ * by the overflow context, leaving .nav__controls (margin-bottom:0) flush
+ * with the bottom of the viewport.
+ *
+ * Fix: override margin-bottom on .nav__controls directly (avoids the
+ * overflow clipping issue) and add safe-area-inset-bottom for notched
+ * devices / mobile Chrome.
+ */
+.nav__controls {
+  margin-bottom: max(
+    calc(var(--base, 1.538rem) * 1.5),
+    env(safe-area-inset-bottom, 16px)
+  );
+  padding-bottom: 4px; /* extra visual buffer so the avatar doesn't touch the margin */
+}
