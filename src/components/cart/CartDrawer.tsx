@@ -36,7 +36,7 @@ export function CartDrawer({
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && closeDrawer()}>
-      <SheetContent className="flex flex-col w-full sm:max-w-md">
+      <SheetContent className="flex flex-col w-full sm:max-w-md px-6 pt-6 pb-4">
         <SheetHeader className="pb-2">
           <SheetTitle className="flex items-center gap-2">
             <ShoppingCart className="h-4 w-4" />
@@ -63,7 +63,7 @@ export function CartDrawer({
         ) : (
           <>
             {/* Items */}
-            <div className="flex-1 overflow-y-auto -mx-6 px-6 space-y-4 py-2">
+            <div className="flex-1 overflow-y-auto space-y-4 py-2">
               {items.map((item) => (
                 <div key={item.variantSku} className="flex gap-3">
                   {/* Placeholder image */}

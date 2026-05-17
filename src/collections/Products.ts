@@ -1,4 +1,4 @@
-import type { CollectionConfig } from "payload";
+import type { CollectionConfig, CollectionAfterChangeHook } from "payload";
 import { isAdmin, isAdminOrActive } from "../lib/payload-access";
 
 // ---------------------------------------------------------------------------
@@ -15,6 +15,48 @@ function slugifyText(text: string): string {
     .replace(/\s+/g, "-")              // spaces → hyphens
     .replace(/-+/g, "-");              // collapse consecutive hyphens
 }
+
+// ---------------------------------------------------------------------------
+// afterChange hook — create initial variant when flag is set
+// ---------------------------------------------------------------------------
+
+const createInitialVariantHook: CollectionAfterChangeHook = async ({
+  doc,
+  req: { payload },
+}) => {
+  if (!doc.createInitialVariant) return doc;
+  if (!doc.initialVariantSku || !doc.initialVariantSaleType) return doc;
+
+  // Skip if a variant with the same SKU already exists
+  const existing = await payload.find({
+    collection: "variants",
+    where: { sku: { equals: doc.initialVariantSku } },
+    limit: 1,
+  });
+  if (existing.totalDocs > 0) return doc;
+
+  await payload.create({
+    collection: "variants",
+    data: {
+      product: doc.id,
+      sku: doc.initialVariantSku as string,
+      saleType: doc.initialVariantSaleType as "piece" | "box" | "lot",
+      unitsPerPackage: (doc.initialVariantUnitsPerPackage as number) ?? 1,
+      price: (doc.initialVariantPrice as number) ?? 0,
+      stock: (doc.initialVariantStock as number) ?? 0,
+      isActive: true,
+    },
+  });
+
+  // Clear the flag so re-saves don't re-create
+  await payload.update({
+    collection: "products",
+    id: doc.id,
+    data: { createInitialVariant: false },
+  });
+
+  return doc;
+};
 
 // ---------------------------------------------------------------------------
 // Collection
@@ -46,6 +88,7 @@ export const Products: CollectionConfig = {
         return data;
       },
     ],
+    afterChange: [createInitialVariantHook],
   },
   fields: [
     // -------------------------------------------------------------------------
@@ -327,6 +370,82 @@ export const Products: CollectionConfig = {
               defaultValue: false,
               admin: {
                 description: "Aparece en la sección 'Productos destacados' de la página de inicio.",
+              },
+            },
+          ],
+        },
+
+        // -------------------------------------------------------------------
+        // Tab 6: Variante inicial (atajo de creación rápida)
+        // -------------------------------------------------------------------
+        {
+          label: "Variante inicial",
+          fields: [
+            {
+              name: "createInitialVariant",
+              type: "checkbox",
+              label: "Crear variante al guardar",
+              defaultValue: false,
+              admin: {
+                description:
+                  "Activa esta opción para crear automáticamente la primera variante de venta " +
+                  "al guardar el producto. Se desactiva solo después de crearla. " +
+                  "Si ya existe una variante con el mismo SKU, se omite.",
+              },
+            },
+            {
+              name: "initialVariantSku",
+              type: "text",
+              label: "SKU de la variante",
+              admin: {
+                description: "Código único. Ej. SIEM-5SL6110-7-PIE. Requerido si activas la creación.",
+                condition: (data) => !!data.createInitialVariant,
+              },
+            },
+            {
+              name: "initialVariantSaleType",
+              type: "select",
+              label: "Tipo de presentación",
+              options: [
+                { label: "Pieza — unidad individual", value: "piece" },
+                { label: "Caja — empaque con múltiples unidades", value: "box" },
+                { label: "Lote — cantidad mayor con descuento", value: "lot" },
+              ],
+              defaultValue: "piece",
+              admin: {
+                condition: (data) => !!data.createInitialVariant,
+              },
+            },
+            {
+              name: "initialVariantUnitsPerPackage",
+              type: "number",
+              label: "Unidades por empaque",
+              min: 1,
+              defaultValue: 1,
+              admin: {
+                description: "Para pieza: 1. Para caja o lote: cantidad incluida en el precio.",
+                condition: (data) => !!data.createInitialVariant,
+              },
+            },
+            {
+              name: "initialVariantPrice",
+              type: "number",
+              label: "Precio (MXN, IVA incluido)",
+              min: 0,
+              defaultValue: 0,
+              admin: {
+                description: "Precio de venta al público. Ej. 299.00",
+                condition: (data) => !!data.createInitialVariant,
+              },
+            },
+            {
+              name: "initialVariantStock",
+              type: "number",
+              label: "Stock inicial",
+              min: 0,
+              defaultValue: 0,
+              admin: {
+                condition: (data) => !!data.createInitialVariant,
               },
             },
           ],

@@ -8,7 +8,7 @@
  * All cart/auth state is read via hooks; totals use the real settings passed in.
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import {
@@ -35,6 +35,7 @@ import {
   validateCartStock,
 } from "@/lib/pricing";
 import type { StorefrontSettings } from "@/data/mock-settings";
+import type { Address } from "@/types/address";
 import { submitCheckout } from "../actions";
 
 // ---------------------------------------------------------------------------
@@ -44,6 +45,8 @@ import { submitCheckout } from "../actions";
 interface CheckoutClientProps {
   /** Real storefront settings from Payload (or MOCK_SETTINGS when DATA_SOURCE=mock). */
   settings: Pick<StorefrontSettings, "flatShippingRate" | "currency" | "taxIncludedByDefault">;
+  /** Customer's saved addresses (empty when not logged in or mock mode). */
+  savedAddresses?: Address[];
 }
 
 // ---------------------------------------------------------------------------
@@ -95,13 +98,44 @@ const ESTADOS_MX = [
 // Component
 // ---------------------------------------------------------------------------
 
-export function CheckoutClient({ settings }: CheckoutClientProps) {
+export function CheckoutClient({ settings, savedAddresses = [] }: CheckoutClientProps) {
   const { data: session, status: sessionStatus } = useSession();
   const { items, clear } = useCart();
   const [form, setForm] = useState<CheckoutForm>(EMPTY_FORM);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(
+    savedAddresses.find((a) => a.isDefault)?.id ?? savedAddresses[0]?.id ?? null
+  );
   const [submitState, setSubmitState] = useState<"idle" | "loading" | "error">("idle");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof CheckoutForm, string>>>({});
+
+  // Prefill contact fields from session when it becomes available.
+  // Only fills empty fields so the user can still override manually.
+  useEffect(() => {
+    if (session?.user) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setForm((prev) => ({
+        ...prev,
+        nombre: prev.nombre || session.user?.name || "",
+        email: prev.email || session.user?.email || "",
+      }));
+    }
+  }, [session]);
+
+  // Populates address fields when user selects a saved address.
+  // Called directly from the radio onChange handler (not via effect).
+  function handleAddressSelect(addr: Address) {
+    setSelectedAddressId(addr.id);
+    setForm((prev) => ({
+      ...prev,
+      nombre: prev.nombre || addr.fullName,
+      telefono: prev.telefono || addr.phone || "",
+      direccion: addr.addressLine1 + (addr.addressLine2 ? `, ${addr.addressLine2}` : ""),
+      ciudad: addr.city,
+      estado: addr.state,
+      codigoPostal: addr.postalCode,
+    }));
+  }
 
   // Compute totals using real settings from Payload
   const totals = useMemo(
@@ -317,6 +351,58 @@ export function CheckoutClient({ settings }: CheckoutClientProps) {
                 <Truck className="h-4 w-4 text-muted-foreground" />
                 Dirección de entrega
               </h2>
+
+              {/* Saved address selector */}
+              {savedAddresses.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Mis domicilios guardados
+                  </p>
+                  <div className="grid grid-cols-1 gap-2">
+                    {savedAddresses.map((addr) => (
+                      <label
+                        key={addr.id}
+                        className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
+                          selectedAddressId === addr.id
+                            ? "border-primary bg-primary/5"
+                            : "border-border hover:bg-accent/30"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="savedAddress"
+                          value={addr.id}
+                          checked={selectedAddressId === addr.id}
+                          onChange={() => handleAddressSelect(addr)}
+                          className="mt-0.5 shrink-0"
+                        />
+                        <div className="text-sm min-w-0">
+                          <p className="font-medium text-card-foreground">{addr.label}</p>
+                          <p className="text-muted-foreground text-xs">
+                            {addr.addressLine1}, {addr.city}, {addr.state} {addr.postalCode}
+                          </p>
+                        </div>
+                      </label>
+                    ))}
+                    <label className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
+                      selectedAddressId === null
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:bg-accent/30"
+                    }`}>
+                      <input
+                        type="radio"
+                        name="savedAddress"
+                        value=""
+                        checked={selectedAddressId === null}
+                        onChange={() => setSelectedAddressId(null)}
+                        className="mt-0.5 shrink-0"
+                      />
+                      <span className="text-sm text-card-foreground">Ingresar nueva dirección</span>
+                    </label>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 gap-4">
                 <FormField
                   id="direccion" label="Dirección" required

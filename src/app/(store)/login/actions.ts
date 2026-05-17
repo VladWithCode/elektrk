@@ -6,6 +6,11 @@
  * Called by LoginForm via useActionState. Returns a typed result object
  * so the form can display errors without a full page reload.
  *
+ * On success, returns { success: true, redirectTo } so the client component
+ * can call useSession().update() to refresh the JWT cookie, then router.push()
+ * — this avoids the bug where a server-side redirect sets the cookie but the
+ * client-side useSession() hook in the Navbar never sees it without a full reload.
+ *
  * Guards:
  *   - If DATABASE_URL is not set → friendly message (DB_NOT_CONFIGURED)
  *   - Basic field validation before attempting signIn
@@ -13,11 +18,11 @@
  */
 
 import { isAuthConfigured } from "@auth";
-import { redirect } from "next/navigation";
 
 export interface LoginState {
   error?: string;
   success?: boolean;
+  redirectTo?: string;
 }
 
 export async function loginAction(
@@ -35,6 +40,13 @@ export async function loginAction(
 
   const email = (formData.get("email") as string | null)?.trim() ?? "";
   const password = (formData.get("password") as string | null) ?? "";
+  const rawCallback = (formData.get("callbackUrl") as string | null) ?? "";
+
+  // Only allow internal routes to prevent open-redirect attacks
+  const redirectTo =
+    rawCallback.startsWith("/") && !rawCallback.startsWith("//")
+      ? rawCallback
+      : "/account";
 
   // Basic field validation
   if (!email) return { error: "El correo electrónico es requerido." };
@@ -76,6 +88,7 @@ export async function loginAction(
     return { error: "Error al iniciar sesión. Inténtalo de nuevo." };
   }
 
-  // On success, redirect to account (or callbackUrl)
-  redirect("/account");
+  // Return success + destination so the client can call update() before navigating.
+  // This ensures useSession() in the Navbar reflects the new session immediately.
+  return { success: true, redirectTo };
 }

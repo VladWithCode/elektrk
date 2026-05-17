@@ -32,6 +32,8 @@ interface CatalogClientProps {
   /** All active products from the server (initial SSR load). */
   products: Product[];
   filterOptions: ProductFilterOptions;
+  /** Filters pre-populated from URL query params (e.g. navigation links). */
+  initialFilters?: Partial<FilterState>;
 }
 
 const DEFAULT_FILTERS: FilterState = {
@@ -45,9 +47,9 @@ const DEFAULT_FILTERS: FilterState = {
   sortBy: "name_asc",
 };
 
-export function CatalogClient({ products, filterOptions }: CatalogClientProps) {
-  // Technical filters — client-side, instant
-  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
+export function CatalogClient({ products, filterOptions, initialFilters }: CatalogClientProps) {
+  // Technical filters — client-side, instant; seeded from URL params when present
+  const [filters, setFilters] = useState<FilterState>({ ...DEFAULT_FILTERS, ...initialFilters });
 
   // Base product list — replaced by fuzzy search results when user types
   const [baseProducts, setBaseProducts] = useState<Product[]>(products);

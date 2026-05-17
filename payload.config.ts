@@ -9,6 +9,7 @@ import { fileURLToPath } from "url";
 // NOTE: relative paths required — payload CLI runs under Node.js ESM which
 // does not resolve TypeScript path aliases (@/) without a bundler.
 import { Admins } from "./src/collections/Admins";
+import { Addresses } from "./src/collections/Addresses";
 import { Media } from "./src/collections/Media";
 import { Products } from "./src/collections/Products";
 import { Variants } from "./src/collections/Variants";
@@ -43,6 +44,8 @@ export default buildConfig({
     OrderItems,
     // Support
     Tickets,
+    // Clientes
+    Addresses,
   ],
 
   globals: [Settings],

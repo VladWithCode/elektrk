@@ -10,6 +10,10 @@ import { getSessionSafe, isAuthConfigured } from "@/lib/auth/helpers";
 import { getAccountDashboard } from "@/lib/repositories/account";
 import { ORDER_STATUS_BADGE_VARIANT, ORDER_STATUS_LABELS } from "@/types/order";
 import { LogoutButton } from "@/components/auth/LogoutButton";
+import { ProfileEditSection } from "@/components/account/ProfileEditSection";
+import { ChangePasswordSection } from "@/components/account/ChangePasswordSection";
+import { AddressesSection } from "@/components/account/AddressesSection";
+import { getMyAddresses } from "@/app/(store)/account/address-actions";
 
 export const metadata: Metadata = {
   title: "Mi cuenta",
@@ -20,7 +24,10 @@ export const metadata: Metadata = {
 
 export default async function AccountPage() {
   const session = await getSessionSafe();
-  const dashboard = await getAccountDashboard(session?.user ?? null);
+  const [dashboard, savedAddresses] = await Promise.all([
+    getAccountDashboard(session?.user ?? null),
+    getMyAddresses(),
+  ]);
 
   const { user, recentOrders, stats, isDemoMode } = dashboard;
   const authReady = isAuthConfigured();
@@ -102,8 +109,14 @@ export default async function AccountPage() {
                 ? "Sesión activa. Los datos se cargan desde Auth.js."
                 : "Conecta Neon y configura AUTH_SECRET para activar sesiones reales."}
             </p>
-            <Button variant="outline" size="sm" disabled>Editar perfil</Button>
+            <ProfileEditSection currentName={user.name ?? null} />
           </div>
+
+          {/* Change password */}
+          {!isDemoMode && <ChangePasswordSection />}
+
+          {/* Saved addresses */}
+          {!isDemoMode && <AddressesSection initialAddresses={savedAddresses} />}
 
           {/* Recent orders */}
           <div>

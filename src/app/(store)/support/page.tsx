@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { MessageSquare, ArrowRight, LifeBuoy, BookOpen, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AnimatedSection } from "@/components/shared/AnimatedSection";
 
 export const metadata: Metadata = {
   title: "Centro de soporte",
@@ -61,9 +62,11 @@ export default function SupportPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {HELP_TOPICS.map(({ icon: Icon, title, description, href, cta }) => (
-          <div
+        {HELP_TOPICS.map(({ icon: Icon, title, description, href, cta }, i) => (
+          <AnimatedSection
             key={title}
+            as="div"
+            delay={i * 0.1}
             className="flex flex-col gap-4 p-6 rounded-xl border border-border bg-card hover:shadow-md transition-shadow"
           >
             <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -81,7 +84,7 @@ export default function SupportPage() {
                 <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </Button>
-          </div>
+          </AnimatedSection>
         ))}
       </div>
     </div>

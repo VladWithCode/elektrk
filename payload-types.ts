@@ -74,6 +74,7 @@ export interface Config {
     orders: Order;
     'order-items': OrderItem;
     tickets: Ticket;
+    addresses: Address;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -95,6 +96,7 @@ export interface Config {
     orders: OrdersSelect<false> | OrdersSelect<true>;
     'order-items': OrderItemsSelect<false> | OrderItemsSelect<true>;
     tickets: TicketsSelect<false> | TicketsSelect<true>;
+    addresses: AddressesSelect<false> | AddressesSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -319,6 +321,24 @@ export interface Product {
    * Aparece en la sección 'Productos destacados' de la página de inicio.
    */
   featured?: boolean | null;
+  /**
+   * Activa esta opción para crear automáticamente la primera variante de venta al guardar el producto. Se desactiva solo después de crearla. Si ya existe una variante con el mismo SKU, se omite.
+   */
+  createInitialVariant?: boolean | null;
+  /**
+   * Código único. Ej. SIEM-5SL6110-7-PIE. Requerido si activas la creación.
+   */
+  initialVariantSku?: string | null;
+  initialVariantSaleType?: ('piece' | 'box' | 'lot') | null;
+  /**
+   * Para pieza: 1. Para caja o lote: cantidad incluida en el precio.
+   */
+  initialVariantUnitsPerPackage?: number | null;
+  /**
+   * Precio de venta al público. Ej. 299.00
+   */
+  initialVariantPrice?: number | null;
+  initialVariantStock?: number | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -499,6 +519,44 @@ export interface Ticket {
   createdAt: string;
 }
 /**
+ * Domicilios guardados por los clientes para el checkout.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "addresses".
+ */
+export interface Address {
+  id: number;
+  /**
+   * session.user.id del cliente (JWT sub).
+   */
+  customerAuthId: string;
+  customerEmail: string;
+  /**
+   * Nombre del domicilio. Ej: "Casa", "Oficina".
+   */
+  label: string;
+  fullName: string;
+  phone?: string | null;
+  /**
+   * Calle, número exterior e interior, colonia.
+   */
+  addressLine1: string;
+  /**
+   * Opcional: referencias adicionales.
+   */
+  addressLine2?: string | null;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+  /**
+   * Si está marcado, se selecciona automáticamente en el checkout.
+   */
+  isDefault?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
@@ -549,6 +607,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'tickets';
         value: number | Ticket;
+      } | null)
+    | ({
+        relationTo: 'addresses';
+        value: number | Address;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -697,6 +759,12 @@ export interface ProductsSelect<T extends boolean = true> {
   metaImage?: T;
   isActive?: T;
   featured?: T;
+  createInitialVariant?: T;
+  initialVariantSku?: T;
+  initialVariantSaleType?: T;
+  initialVariantUnitsPerPackage?: T;
+  initialVariantPrice?: T;
+  initialVariantStock?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -788,6 +856,26 @@ export interface TicketsSelect<T extends boolean = true> {
   priority?: T;
   status?: T;
   adminNotes?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "addresses_select".
+ */
+export interface AddressesSelect<T extends boolean = true> {
+  customerAuthId?: T;
+  customerEmail?: T;
+  label?: T;
+  fullName?: T;
+  phone?: T;
+  addressLine1?: T;
+  addressLine2?: T;
+  city?: T;
+  state?: T;
+  postalCode?: T;
+  country?: T;
+  isDefault?: T;
   updatedAt?: T;
   createdAt?: T;
 }

@@ -8,6 +8,7 @@ import { ProductVariantSelector } from "@/components/products/ProductVariantSele
 import { ProductCard } from "@/components/products/ProductCard";
 import { DatasheetButton } from "@/components/shared/DatasheetButton";
 import { SectionHeader } from "@/components/shared/SectionHeader";
+import { AnimatedSection } from "@/components/shared/AnimatedSection";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { SPEC_LABELS } from "@/lib/constants";
@@ -175,7 +176,7 @@ export default async function ProductDetailPage({ params }: Props) {
       </div>
 
       {/* Specs table */}
-      <div className="mt-16">
+      <AnimatedSection as="div" className="mt-16">
         <SectionHeader title="Especificaciones técnicas" className="mb-4" />
         <div className="rounded-xl border border-border overflow-hidden">
           <table className="w-full text-sm">
@@ -194,11 +195,11 @@ export default async function ProductDetailPage({ params }: Props) {
             </tbody>
           </table>
         </div>
-      </div>
+      </AnimatedSection>
 
       {/* Related products */}
       {related.length > 0 && (
-        <div className="mt-16">
+        <AnimatedSection as="div" className="mt-16" delay={0.1}>
           <SectionHeader
             title="Productos relacionados"
             subtitle="De la misma marca o configuración similar"
@@ -209,7 +210,7 @@ export default async function ProductDetailPage({ params }: Props) {
               <ProductCard key={p.id} product={p} />
             ))}
           </div>
-        </div>
+        </AnimatedSection>
       )}
     </div>
   );
