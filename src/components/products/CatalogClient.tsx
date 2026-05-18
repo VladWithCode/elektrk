@@ -1,24 +1,23 @@
 "use client";
 
 /**
- * CatalogClient — Phase 12B
+ * CatalogClient — URL-driven catalog with fuzzy search
+ *
+ * Filters live in the URL (useSearchParams), not in local state alone.
+ * This means:
+ *   - Navigation links like /products?brand=Siemens work even when the user
+ *     is already on /products.
+ *   - Changing filters in the UI updates the URL (shareable, bookmarkable).
+ *   - Back/forward browser navigation restores the correct filter state.
  *
  * Text search: server-side pg_trgm fuzzy search via searchProductsAction().
- *   - Debounced 350 ms before firing.
- *   - Uses useTransition so the UI stays responsive while waiting.
- *   - Shows a "Resultados relacionados" indicator when fuzzy results are active.
- *   - Falls back to all products when query is cleared.
- *
- * Technical filters (amperage, poles, voltage, tripCurve, brand, category):
- *   - Still applied client-side via applyFilters() — instant, no round-trip.
- *   - Applied on top of whatever products the server returned.
- *
- * Error handling:
- *   - If the server action fails (pg_trgm down, network), falls back to
- *     simple client-side substring match so the user always gets something.
+ *   - Debounced 350 ms before updating the URL (?q=...).
+ *   - URL change triggers a useEffect that fires the server action.
+ *   - Falls back to client-side substring when pg_trgm is unavailable.
  */
 
-import { useMemo, useState, useTransition, useRef } from "react";
+import { useMemo, useState, useTransition, useRef, useEffect } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Loader2, SearchX, Sparkles } from "lucide-react";
 import { ProductGrid } from "@/components/products/ProductGrid";
 import { ProductFilters } from "@/components/products/ProductFilters";
@@ -28,13 +27,9 @@ import type { Product, FilterState } from "@/types/product";
 import type { ProductFilterOptions } from "@/lib/repositories/products";
 import { searchProductsAction } from "@/app/(store)/products/actions";
 
-interface CatalogClientProps {
-  /** All active products from the server (initial SSR load). */
-  products: Product[];
-  filterOptions: ProductFilterOptions;
-  /** Filters pre-populated from URL query params (e.g. navigation links). */
-  initialFilters?: Partial<FilterState>;
-}
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 const DEFAULT_FILTERS: FilterState = {
   amperage: [],
@@ -47,66 +42,154 @@ const DEFAULT_FILTERS: FilterState = {
   sortBy: "name_asc",
 };
 
-export function CatalogClient({ products, filterOptions, initialFilters }: CatalogClientProps) {
-  // Technical filters — client-side, instant; seeded from URL params when present
-  const [filters, setFilters] = useState<FilterState>({ ...DEFAULT_FILTERS, ...initialFilters });
+const VALID_SORT = new Set(["name_asc", "price_asc", "price_desc", "stock_desc"]);
 
-  // Base product list — replaced by fuzzy search results when user types
+/** Parse a FilterState from the current URL search params. */
+function parseFiltersFromSearchParams(params: URLSearchParams): FilterState {
+  const getAll = (key: string) => params.getAll(key);
+  const getAllNum = (key: string) =>
+    getAll(key).map(Number).filter((n) => !isNaN(n));
+
+  const rawSort = params.get("sortBy") ?? "name_asc";
+
+  return {
+    brand: getAll("brand"),
+    poles: getAllNum("poles") as FilterState["poles"],
+    voltage: getAllNum("voltage") as FilterState["voltage"],
+    tripCurve: getAll("tripCurve") as FilterState["tripCurve"],
+    amperage: getAllNum("amperage"),
+    category: getAll("category"),
+    search: params.get("q") ?? "",
+    sortBy: (VALID_SORT.has(rawSort) ? rawSort : "name_asc") as FilterState["sortBy"],
+  };
+}
+
+/** Serialize a FilterState back to URL search params. */
+function serializeFiltersToParams(filters: FilterState): URLSearchParams {
+  const p = new URLSearchParams();
+  filters.brand.forEach((v) => p.append("brand", v));
+  filters.poles.forEach((v) => p.append("poles", String(v)));
+  filters.voltage.forEach((v) => p.append("voltage", String(v)));
+  filters.tripCurve.forEach((v) => p.append("tripCurve", v));
+  filters.amperage.forEach((v) => p.append("amperage", String(v)));
+  filters.category.forEach((v) => p.append("category", v));
+  if (filters.sortBy && filters.sortBy !== "name_asc") p.set("sortBy", filters.sortBy);
+  if (filters.search) p.set("q", filters.search);
+  return p;
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+interface CatalogClientProps {
+  /** All active products from the server (initial SSR load). */
+  products: Product[];
+  filterOptions: ProductFilterOptions;
+  /** Kept for backward compatibility but no longer used — URL is the source of truth. */
+  initialFilters?: Partial<FilterState>;
+}
+
+export function CatalogClient({ products, filterOptions }: CatalogClientProps) {
+  const searchParamsHook = useSearchParams();
+  const router = useRouter();
+
+  // Filters are derived from the URL on every render — no useState needed.
+  const filters = useMemo(
+    () => parseFiltersFromSearchParams(searchParamsHook),
+    [searchParamsHook]
+  );
+
+  // Base product list — replaced by fuzzy search results when a ?q= is active.
   const [baseProducts, setBaseProducts] = useState<Product[]>(products);
 
-  // Search input text (shown in the input box, may be ahead of the debounce)
-  const [searchInput, setSearchInput] = useState("");
+  // Search input text shown in the box — leads the URL by up to 350 ms.
+  const [searchInput, setSearchInput] = useState(filters.search);
 
-  // True while the server action is in-flight
+  // True while the server action is in-flight.
   const [isPending, startTransition] = useTransition();
 
-  // True when baseProducts is a fuzzy/filtered subset (not all products)
+  // True when baseProducts is a fuzzy/server-filtered subset.
   const [isFuzzySearch, setIsFuzzySearch] = useState(false);
 
-  // Ref for the debounce timer
+  // Debounce timer for the search box.
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // -------------------------------------------------------------------------
+  // Sync: when the ?q= URL param changes, fire (or clear) the fuzzy search.
+  // Also sync the search input box with the URL (e.g. on external navigation).
+  // -------------------------------------------------------------------------
+  useEffect(() => {
+    const q = filters.search;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSearchInput(q); // sync input box with URL (e.g. on external navigation)
+
+    if (!q) {
+      setBaseProducts(products);
+      setIsFuzzySearch(false);
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        const results = await searchProductsAction(q);
+        setBaseProducts(results);
+        setIsFuzzySearch(true);
+      } catch {
+        // pg_trgm unavailable — fall back to client-side substring
+        const fallback = applyFilters(products, { ...DEFAULT_FILTERS, search: q });
+        setBaseProducts(fallback);
+        setIsFuzzySearch(false);
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.search]); // `products` intentionally omitted; handled in the effect below
+
+  // Reset base products when the parent passes a fresh product list (e.g., full navigation)
+  // but only when no active search (search effect handles that case).
+  useEffect(() => {
+    if (!filters.search) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setBaseProducts(products);
+    }
+  }, [products, filters.search]);
+
+  // -------------------------------------------------------------------------
   // Apply technical filters client-side on top of (possibly fuzzy) baseProducts.
   // Pass search: "" because text search is already done server-side.
+  // -------------------------------------------------------------------------
   const filtered = useMemo(
     () => applyFilters(baseProducts, { ...filters, search: "" }),
     [baseProducts, filters]
   );
 
   // -------------------------------------------------------------------------
-  // Search handler — debounced, calls server action
+  // Handlers — update URL; URL change propagates back to `filters` via useMemo
   // -------------------------------------------------------------------------
 
-  function handleSearch(query: string) {
-    setSearchInput(query);
+  /** Called by ProductFilters when any filter pill / sort is toggled. */
+  function handleFiltersChange(newFilters: FilterState) {
+    const qs = serializeFiltersToParams(newFilters).toString();
+    router.replace(`/products${qs ? `?${qs}` : ""}`, { scroll: false });
+  }
 
-    // Cancel any pending debounce
+  /** Called by ProductSearch as the user types — debounced URL update. */
+  function handleSearch(query: string) {
+    setSearchInput(query); // immediate UI feedback
+
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     if (!query.trim()) {
-      // Immediately reset to all products when cleared
-      setBaseProducts(products);
-      setIsFuzzySearch(false);
+      // Clear immediately
+      debounceRef.current = null;
+      const qs = serializeFiltersToParams({ ...filters, search: "" }).toString();
+      router.replace(`/products${qs ? `?${qs}` : ""}`, { scroll: false });
       return;
     }
 
-    // Debounce the server-side call
     debounceRef.current = setTimeout(() => {
-      startTransition(async () => {
-        try {
-          const results = await searchProductsAction(query);
-          setBaseProducts(results);
-          setIsFuzzySearch(true);
-        } catch {
-          // pg_trgm unavailable — fall back to client-side substring match
-          const fallback = applyFilters(products, {
-            ...DEFAULT_FILTERS,
-            search: query,
-          });
-          setBaseProducts(fallback);
-          setIsFuzzySearch(false);
-        }
-      });
+      const qs = serializeFiltersToParams({ ...filters, search: query }).toString();
+      router.replace(`/products${qs ? `?${qs}` : ""}`, { scroll: false });
     }, 350);
   }
 
@@ -149,7 +232,7 @@ export function CatalogClient({ products, filterOptions, initialFilters }: Catal
         <div className="w-full lg:w-56 shrink-0">
           <ProductFilters
             filters={filters}
-            onChange={setFilters}
+            onChange={handleFiltersChange}
             filterOptions={filterOptions}
             totalCount={baseProducts.length}
             filteredCount={filtered.length}

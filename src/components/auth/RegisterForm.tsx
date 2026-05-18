@@ -4,13 +4,20 @@
  * RegisterForm — client component for /register
  *
  * Uses React 19 useActionState to call the registerAction Server Action.
- * Shows field validation errors and the "not configured" message when
- * DATABASE_URL is not set.
+ *
+ * On success: calls useSession().update() to refresh the JWT state in the
+ * client-side session cache (so the Navbar sees the new session immediately),
+ * then navigates to the redirectTo URL from the action result.
+ *
+ * Same pattern as LoginForm — avoids the bug where a server-side redirect
+ * bypasses update() and leaves the Navbar showing "Iniciar sesión".
  */
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -21,22 +28,32 @@ const initialState: RegisterState = {};
 
 export function RegisterForm() {
   const [state, formAction, isPending] = useActionState(registerAction, initialState);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { update } = useSession();
+
+  const callbackUrl = searchParams.get("callbackUrl") ?? "";
+
+  // After a successful registration, refresh the session in useSession() before
+  // navigating — this updates the Navbar without requiring a full page reload.
+  useEffect(() => {
+    if (state.success && state.redirectTo) {
+      update().then(() => {
+        router.push(state.redirectTo!);
+      });
+    }
+  }, [state.success, state.redirectTo, update, router]);
 
   return (
     <form action={formAction} className="space-y-4">
+      {/* Pass callbackUrl through the form so the action can read it */}
+      <input type="hidden" name="callbackUrl" value={callbackUrl} />
+
       {/* Error banner */}
       {state.error && (
         <div role="alert" className="flex items-start gap-2.5 rounded-lg border border-destructive/50 bg-destructive/5 px-4 py-3 text-sm text-destructive">
           <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" aria-hidden="true" />
           <span>{state.error}</span>
-        </div>
-      )}
-
-      {/* Success banner */}
-      {state.success && state.message && (
-        <div role="status" className="flex items-start gap-2.5 rounded-lg border border-green-500/50 bg-green-500/5 px-4 py-3 text-sm text-green-700 dark:text-green-400">
-          <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" aria-hidden="true" />
-          <span>{state.message}</span>
         </div>
       )}
 
@@ -105,7 +122,7 @@ export function RegisterForm() {
         type="submit"
         className="w-full"
         size="lg"
-        disabled={isPending || state.success}
+        disabled={isPending || !!state.success}
       >
         {isPending ? (
           <>

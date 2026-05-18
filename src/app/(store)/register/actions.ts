@@ -6,23 +6,23 @@
  * Called by RegisterForm via useActionState. Validates input, hashes the
  * password, and creates the user record in the `users` Auth.js table.
  *
- * Guards:
- *   - If DATABASE_URL is not set → friendly message
- *   - Full field validation (name, email, password length, confirmation match)
- *   - Duplicate email check via Neon query
+ * On success: returns { success: true, redirectTo } so the client component
+ * can call useSession().update() before navigating — this ensures the Navbar
+ * sees the new session immediately without a full page reload.
  *
- * On success: inserts user, auto-signs-in via Credentials, redirects to /account.
+ * NOTE: redirect() must NOT be used here because it bypasses the client,
+ * preventing RegisterForm from calling update(). Same pattern as loginAction.
  */
 
 import { isAuthConfigured } from "@auth";
 import { hashPassword } from "@/lib/auth/password";
 import { Pool } from "@neondatabase/serverless";
-import { redirect } from "next/navigation";
 
 export interface RegisterState {
   error?: string;
   success?: boolean;
-  message?: string;
+  /** Client-side redirect target — only present on success. */
+  redirectTo?: string;
 }
 
 // Minimum password requirements
@@ -48,6 +48,13 @@ export async function registerAction(
   const email = (formData.get("email") as string | null)?.trim() ?? "";
   const password = (formData.get("password") as string | null) ?? "";
   const confirmPassword = (formData.get("confirmPassword") as string | null) ?? "";
+  const rawCallback = (formData.get("callbackUrl") as string | null) ?? "";
+
+  // Only allow internal routes to prevent open-redirect attacks
+  const redirectTo =
+    rawCallback.startsWith("/") && !rawCallback.startsWith("//")
+      ? rawCallback
+      : "/account";
 
   // Validation
   if (!firstName) return { error: "El nombre es requerido." };
@@ -68,10 +75,8 @@ export async function registerAction(
   const passwordHash = await hashPassword(password);
 
   // Phase 6B — insert into Neon and auto-login
-  // Prerequisite: DATABASE_URL set, db:auth:migrate executed.
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   try {
-    // Normalize email to lowercase before duplicate check
     const normalizedEmail = email.toLowerCase();
 
     // Reject duplicate emails
@@ -83,7 +88,7 @@ export async function registerAction(
       return { error: "Ya existe una cuenta con ese correo electrónico." };
     }
 
-    // Insert into Auth.js `users` table (password_hash column from auth-migration.sql)
+    // Insert into Auth.js `users` table
     await pool.query(
       `INSERT INTO users (id, name, email, "emailVerified", password_hash)
        VALUES (gen_random_uuid()::text, $1, $2, NULL, $3)`,
@@ -93,9 +98,11 @@ export async function registerAction(
     await pool.end();
   }
 
-  // Sign in immediately after registration (sets JWT cookie)
+  // Sign in immediately after registration (sets JWT cookie in HTTP response)
   const { signIn } = await import("@auth");
   await signIn("credentials", { email: email.toLowerCase(), password, redirect: false });
 
-  redirect("/account");
+  // Return success + destination so the client can call update() before navigating.
+  // This ensures useSession() in the Navbar reflects the new session immediately.
+  return { success: true, redirectTo };
 }

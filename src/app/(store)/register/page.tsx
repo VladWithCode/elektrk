@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import Link from "next/link";
 import { Zap } from "lucide-react";
 import { RegisterForm } from "@/components/auth/RegisterForm";
@@ -37,7 +38,9 @@ export default function RegisterPage() {
           </p>
         </div>
 
-        <RegisterForm />
+        <Suspense>
+          <RegisterForm />
+        </Suspense>
       </div>
     </div>
   );

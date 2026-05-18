@@ -101,10 +101,30 @@ const ESTADOS_MX = [
 export function CheckoutClient({ settings, savedAddresses = [] }: CheckoutClientProps) {
   const { data: session, status: sessionStatus } = useSession();
   const { items, clear } = useCart();
-  const [form, setForm] = useState<CheckoutForm>(EMPTY_FORM);
+
+  // Pick the default address (or first) so we can pre-populate the form on mount.
+  const defaultAddr =
+    savedAddresses.find((a) => a.isDefault) ?? savedAddresses[0] ?? null;
+
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(
-    savedAddresses.find((a) => a.isDefault)?.id ?? savedAddresses[0]?.id ?? null
+    defaultAddr?.id ?? null
   );
+
+  // Initialize form with default address data immediately (synchronous prop).
+  // Nombre/email are filled by the session useEffect below once auth resolves.
+  const [form, setForm] = useState<CheckoutForm>(() => {
+    if (!defaultAddr) return EMPTY_FORM;
+    return {
+      ...EMPTY_FORM,
+      telefono: defaultAddr.phone ?? "",
+      direccion:
+        defaultAddr.addressLine1 +
+        (defaultAddr.addressLine2 ? `, ${defaultAddr.addressLine2}` : ""),
+      ciudad: defaultAddr.city,
+      estado: defaultAddr.state,
+      codigoPostal: defaultAddr.postalCode,
+    };
+  });
   const [submitState, setSubmitState] = useState<"idle" | "loading" | "error">("idle");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof CheckoutForm, string>>>({});
@@ -123,13 +143,13 @@ export function CheckoutClient({ settings, savedAddresses = [] }: CheckoutClient
   }, [session]);
 
   // Populates address fields when user selects a saved address.
-  // Called directly from the radio onChange handler (not via effect).
+  // Always overwrites shipping fields (user chose this address explicitly).
+  // Preserves contact fields (nombre, email) already typed/filled from session.
   function handleAddressSelect(addr: Address) {
     setSelectedAddressId(addr.id);
     setForm((prev) => ({
       ...prev,
-      nombre: prev.nombre || addr.fullName,
-      telefono: prev.telefono || addr.phone || "",
+      telefono: addr.phone ?? prev.telefono,
       direccion: addr.addressLine1 + (addr.addressLine2 ? `, ${addr.addressLine2}` : ""),
       ciudad: addr.city,
       estado: addr.state,

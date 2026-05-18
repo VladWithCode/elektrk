@@ -42,7 +42,6 @@ export function LoginForm() {
     if (state.success && state.redirectTo) {
       update().then(() => {
         router.push(state.redirectTo!);
-        router.refresh();
       });
     }
   }, [state.success, state.redirectTo, update, router]);
