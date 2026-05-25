@@ -85,6 +85,16 @@ export default async function StoreRootLayout({
         manropeHeading.variable
       )}
     >
+      <head>
+        {/* Pre-hydration theme script — runs before first paint to apply
+            `.dark` class if user previously chose dark. Default is light;
+            no system-preference fallback so first-time visitors get light. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('elektrk-theme');if(t==='dark'){document.documentElement.classList.add('dark');}}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <ThemeProvider>
           <CartProvider>
