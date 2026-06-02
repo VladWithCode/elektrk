@@ -8,6 +8,7 @@
         "@auth/neon-adapter": "^1.11.2",
         "@neondatabase/serverless": "^1.1.0",
         "@payloadcms/db-postgres": "^3.84.1",
+        "@payloadcms/email-resend": "^3.84.1",
         "@payloadcms/next": "^3.84.1",
         "@payloadcms/richtext-lexical": "^3.84.1",
         "class-variance-authority": "^0.7.1",
@@ -435,6 +436,8 @@
     "@payloadcms/db-postgres": ["@payloadcms/db-postgres@3.84.1", "", { "dependencies": { "@payloadcms/drizzle": "3.84.1", "@types/pg": "8.20.0", "console-table-printer": "2.12.1", "drizzle-kit": "0.31.7", "drizzle-orm": "0.45.2", "pg": "8.20.0", "prompts": "2.4.2", "to-snake-case": "1.0.0", "uuid": "11.1.0" }, "peerDependencies": { "payload": "3.84.1" } }, "sha512-/r1+7k58529ziTwqzySXsZb4x3FcfQIQH8R6gXLM3bTU9JA8wfLBraIgSyVKl6B3p+/EQYcaQ1DUlfrzVRxo1A=="],
 
     "@payloadcms/drizzle": ["@payloadcms/drizzle@3.84.1", "", { "dependencies": { "console-table-printer": "2.12.1", "dequal": "2.0.3", "drizzle-orm": "0.45.2", "prompts": "2.4.2", "to-snake-case": "1.0.0", "uuid": "11.1.0" }, "peerDependencies": { "payload": "3.84.1" } }, "sha512-n/1fgH3fh6omGNecjhOJ32wrxio5ph2VhfQDwMvSEViTUPD9JXp0yJiOUEqzYK/cxoRQWfwBIbvgzpC/a6FsEw=="],
+
+    "@payloadcms/email-resend": ["@payloadcms/email-resend@3.84.1", "", { "peerDependencies": { "payload": "3.84.1" } }, "sha512-LFbsmcWHHu6Epz5DpA1JN9s+NxPwcluUpC0dqF6gtFpmxQJSQAplLnLuB388pnzsiOMDbWDGsksmni357633QQ=="],
 
     "@payloadcms/graphql": ["@payloadcms/graphql@3.84.1", "", { "dependencies": { "graphql-scalars": "1.22.2", "pluralize": "8.0.0", "ts-essentials": "10.0.3", "tsx": "4.21.0" }, "peerDependencies": { "graphql": "^16.8.1", "payload": "3.84.1" }, "bin": { "payload-graphql": "bin.js" } }, "sha512-pVJdgihEEexpK+kANSozAMf3PQfd6p51/G3cK+rkPzSjghf7X+cQQ8NFOmAMDTpijM5YaowQYTuEje3KaLVXuQ=="],
 
