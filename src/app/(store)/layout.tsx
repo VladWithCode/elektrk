@@ -22,6 +22,7 @@ import { AnnouncementBar } from "@/components/layout/AnnouncementBar";
 import { CartDrawer } from "@/components/cart/CartDrawer";
 import { SessionProvider } from "@/components/auth/SessionProvider";
 import { getStoreSettings } from "@/lib/repositories/settings";
+import Script from "next/script";
 
 const manropeHeading = Manrope({
   subsets: ["latin"],
@@ -86,14 +87,7 @@ export default async function StoreRootLayout({
       )}
     >
       <head>
-        {/* Pre-hydration theme script — runs before first paint to apply
-            `.dark` class if user previously chose dark. Default is light;
-            no system-preference fallback so first-time visitors get light. */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('elektrk-theme');if(t==='dark'){document.documentElement.classList.add('dark');}}catch(e){}})();`,
-          }}
-        />
+        <Script src="/theme-init.js" />
       </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <ThemeProvider>
