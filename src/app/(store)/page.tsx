@@ -9,18 +9,18 @@ import { AnimatedSection } from "@/components/shared/AnimatedSection";
 import { getFeaturedProducts } from "@/lib/repositories/products";
 
 export const metadata: Metadata = {
-  title: "ElektrK — Interruptores Termomagnéticos y Componentes Eléctricos",
+  title: "D.E. MTY — Interruptores Termomagnéticos y Componentes Eléctricos",
   description:
     "Distribuidora especializada en interruptores termomagnéticos, breakers y protecciones eléctricas de Siemens, ABB y Schneider Electric. Venta por pieza, caja o lote con IVA incluido. Envío a toda la república.",
   openGraph: {
-    title: "ElektrK — Interruptores Termomagnéticos y Componentes Eléctricos",
+    title: "D.E. MTY — Interruptores Termomagnéticos y Componentes Eléctricos",
     description:
       "Distribuidora especializada en breakers e interruptores. Siemens, ABB y Schneider Electric. Precios con IVA incluido.",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "ElektrK — Componentes Eléctricos",
+    title: "D.E. MTY — Componentes Eléctricos",
     description:
       "Interruptores termomagnéticos de Siemens, ABB y Schneider Electric. Venta por pieza, caja o lote.",
   },

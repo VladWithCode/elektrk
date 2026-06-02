@@ -29,7 +29,7 @@ export default buildConfig({
   cors: [process.env.NEXT_PUBLIC_SERVER_URL || "http://localhost:3000"],
   email: resendAdapter({
     defaultFromAddress: "onboarding@resend.dev",
-    defaultFromName: "ElektrK Admin",
+    defaultFromName: "Distribuidor Electrico Monterrey Admin",
     apiKey: process.env.RESEND_API_KEY || "",
   }),
 

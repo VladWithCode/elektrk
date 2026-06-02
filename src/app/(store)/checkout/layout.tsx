@@ -7,7 +7,7 @@ import type { Metadata } from "next";
  */
 export const metadata: Metadata = {
   title: "Checkout",
-  description: "Completa tu compra de componentes eléctricos en ElektrK.",
+  description: "Completa tu compra de componentes eléctricos en Distribuidor Electrico Monterrey.",
   robots: { index: false, follow: false },
 };
 

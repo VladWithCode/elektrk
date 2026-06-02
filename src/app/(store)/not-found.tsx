@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { Zap, Home, ShoppingBag } from "lucide-react";
+import { Home, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BrandLogo } from "@/components/shared/BrandLogo";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -19,10 +20,9 @@ export default function NotFound() {
       {/* Brand mark */}
       <Link
         href="/"
-        className="flex items-center gap-2 font-heading font-bold text-xl mb-12 text-foreground hover:text-primary transition-colors"
+        className="mb-12 text-foreground hover:text-primary transition-colors"
       >
-        <Zap className="h-5 w-5 text-primary" />
-        ElektrK
+        <BrandLogo variant="short" className="h-16" />
       </Link>
 
       {/* Error block */}

@@ -7,9 +7,9 @@ import { AnimatedSection } from "@/components/shared/AnimatedSection";
 export const metadata: Metadata = {
   title: "Centro de soporte",
   description:
-    "¿Tienes dudas sobre un pedido o necesitas asistencia técnica? Abre un ticket, consulta preguntas frecuentes o contáctanos directamente. El equipo de ElektrK está aquí para ayudarte.",
+    "¿Tienes dudas sobre un pedido o necesitas asistencia técnica? Abre un ticket, consulta preguntas frecuentes o contáctanos directamente. El equipo de Distribuidor Electrico Monterrey está aquí para ayudarte.",
   openGraph: {
-    title: "Centro de soporte — ElektrK",
+    title: "Centro de soporte — D.E. MTY",
     description:
       "Soporte técnico y atención al cliente para distribución de componentes eléctricos. Tickets con seguimiento en línea.",
     type: "website",

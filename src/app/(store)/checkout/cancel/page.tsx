@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Pago cancelado — ElektrK",
+  title: "Pago cancelado — D.E. MTY",
   robots: { index: false, follow: false },
 };
 

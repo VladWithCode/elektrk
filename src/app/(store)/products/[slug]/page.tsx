@@ -28,7 +28,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!product) {
     return {
       title: "Producto no encontrado",
-      description: "El producto que buscas no existe o ya no está disponible en ElektrK.",
+      description: "El producto que buscas no existe o ya no está disponible en Distribuidor Electrico Monterrey.",
     };
   }
 

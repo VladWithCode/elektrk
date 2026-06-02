@@ -16,7 +16,7 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   return {
-    title: `Orden ${id} — ElektrK`,
+    title: `Orden ${id} — D.E. MTY`,
     robots: { index: false, follow: false },
   };
 }

@@ -48,13 +48,13 @@ export const metadata: Metadata = {
     process.env.NEXT_PUBLIC_SERVER_URL ?? "http://localhost:3000"
   ),
   title: {
-    default: "ElektrK — Componentes Eléctricos",
-    template: "%s | ElektrK",
+    default: "D.E. MTY — Componentes Eléctricos",
+    template: "%s | D.E. MTY",
   },
   description:
     "Distribuidora especializada en interruptores termomagnéticos y componentes eléctricos. Siemens, ABB y Schneider Electric. Precios con IVA incluido.",
   openGraph: {
-    siteName: "ElektrK",
+    siteName: "Distribuidor Electrico Monterrey",
     locale: "es_MX",
     type: "website",
   },

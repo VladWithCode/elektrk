@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
   title: "Mis tickets",
-  description: "Gestiona tus tickets de soporte técnico en ElektrK.",
+  description: "Gestiona tus tickets de soporte técnico en Distribuidor Electrico Monterrey.",
   robots: { index: false, follow: false },
 };
 

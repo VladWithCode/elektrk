@@ -7,7 +7,7 @@ import { RegisterForm } from "@/components/auth/RegisterForm";
 export const metadata: Metadata = {
   title: "Crear cuenta",
   description:
-    "Regístrate en ElektrK para acceder a precios exclusivos, historial de pedidos y soporte técnico especializado en componentes eléctricos.",
+    "Regístrate en Distribuidor Electrico Monterrey para acceder a precios exclusivos, historial de pedidos y soporte técnico especializado en componentes eléctricos.",
   robots: { index: false, follow: false },
 };
 

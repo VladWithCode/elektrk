@@ -74,7 +74,7 @@ export async function Footer() {
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-muted-foreground">
-            © {new Date().getFullYear()} ElektrK. Todos los derechos reservados.
+            © {new Date().getFullYear()} Distribuidor Electrico Monterrey. Todos los derechos reservados.
           </p>
           <p className="text-xs text-muted-foreground">
             Precios con IVA incluido · Envío a tarifa plana

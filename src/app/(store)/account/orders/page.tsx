@@ -11,7 +11,7 @@ import { getOrderSummariesByCustomer } from "@/lib/repositories/orders";
 import { ORDER_STATUS_BADGE_VARIANT, ORDER_STATUS_LABELS } from "@/types/order";
 
 export const metadata: Metadata = {
-  title: "Mis órdenes — ElektrK",
+  title: "Mis órdenes — D.E. MTY",
   robots: { index: false, follow: false },
 };
 

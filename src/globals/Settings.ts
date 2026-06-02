@@ -26,7 +26,7 @@ export const Settings: GlobalConfig = {
           type: "text",
           label: "Nombre de la tienda",
           required: true,
-          defaultValue: "ElektrK",
+          defaultValue: "Distribuidor Electrico Monterrey",
         },
         {
           name: "supportEmail",

@@ -22,7 +22,7 @@ export interface StorefrontSettings {
 }
 
 export const MOCK_SETTINGS: StorefrontSettings = {
-  storeName: "ElektrK",
+  storeName: "Distribuidor Electrico Monterrey",
   supportEmail: "ventas@elektrk.mx",
   storePhone: null,
   whatsapp: null,

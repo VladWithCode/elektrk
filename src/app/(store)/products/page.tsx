@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   description:
     "Explora nuestro catálogo de interruptores termomagnéticos y componentes eléctricos. Filtra por marca, amperaje, polos o curva de disparo. Siemens, ABB y Schneider Electric.",
   openGraph: {
-    title: "Catálogo — ElektrK",
+    title: "Catálogo — D.E. MTY",
     description:
       "Interruptores termomagnéticos de las mejores marcas. Filtra por amperage, polos y curva de disparo.",
     type: "website",

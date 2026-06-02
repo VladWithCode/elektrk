@@ -7,7 +7,7 @@ import { LoginForm } from "@/components/auth/LoginForm";
 export const metadata: Metadata = {
   title: "Iniciar sesión",
   description:
-    "Accede a tu cuenta ElektrK para consultar pedidos, descargar facturas y gestionar tickets de soporte.",
+    "Accede a tu cuenta de Distribuidor Electrico Monterrey para consultar pedidos, descargar facturas y gestionar tickets de soporte.",
   robots: { index: false, follow: false },
 };
 

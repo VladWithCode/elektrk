@@ -10,7 +10,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Tu carrito",
   description:
-    "Revisa los productos en tu carrito, ajusta cantidades y procede al pago de forma segura en ElektrK.",
+    "Revisa los productos en tu carrito, ajusta cantidades y procede al pago de forma segura en Distribuidor Electrico Monterrey.",
   robots: { index: false, follow: false },
 };
 

@@ -10,7 +10,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Mis tickets de soporte",
   description:
-    "Consulta el estado de tus tickets, abre nuevas solicitudes y da seguimiento a la asistencia técnica de tu cuenta ElektrK.",
+    "Consulta el estado de tus tickets, abre nuevas solicitudes y da seguimiento a la asistencia técnica de tu cuenta de Distribuidor Electrico Monterrey.",
   robots: { index: false, follow: false },
 };
 

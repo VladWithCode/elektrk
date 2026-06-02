@@ -5,7 +5,7 @@ import type { Metadata } from "next";
 import { getOrderById } from "@/lib/repositories/orders";
 
 export const metadata: Metadata = {
-  title: "Orden confirmada — ElektrK",
+  title: "Orden confirmada — D.E. MTY",
   robots: { index: false, follow: false },
 };
 

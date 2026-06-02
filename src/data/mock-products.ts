@@ -22,7 +22,7 @@ export const MOCK_PRODUCTS: Product[] = [
     datasheetUrl: "/datasheets/siemens-5sl6110-7.pdf",
     featured: true,
     tags: ["residencial", "distribución"],
-    metaTitle: "Siemens 5SL6110-7 — Interruptor 1P 10A Curva C | ElektrK",
+    metaTitle: "Siemens 5SL6110-7 — Interruptor 1P 10A Curva C | D.E. MTY",
     metaDescription:
       "Compra el Siemens 5SL6110-7: interruptor termomagnético monofásico 10A Curva C, 6kA de ruptura. Precio por pieza o caja. Entrega rápida en México.",
     variants: [
@@ -65,9 +65,9 @@ export const MOCK_PRODUCTS: Product[] = [
     datasheetUrl: "/datasheets/siemens-5sl6216-7.pdf",
     featured: true,
     tags: ["residencial", "bifásico"],
-    metaTitle: "Siemens 5SL6216-7 — Interruptor 2P 16A Curva C | ElektrK",
+    metaTitle: "Siemens 5SL6216-7 — Interruptor 2P 16A Curva C | D.E. MTY",
     metaDescription:
-      "Interruptor bipolar Siemens 5SL6216-7, 16A Curva C. Protección de circuitos bifásicos residenciales y comerciales. Disponible por pieza o caja en ElektrK.",
+      "Interruptor bipolar Siemens 5SL6216-7, 16A Curva C. Protección de circuitos bifásicos residenciales y comerciales. Disponible por pieza o caja en Distribuidor Electrico Monterrey.",
     variants: [
       {
         sku: "5SL6216-7-PZA",
@@ -108,9 +108,9 @@ export const MOCK_PRODUCTS: Product[] = [
     datasheetUrl: "/datasheets/schneider-ik60n-c25.pdf",
     featured: false,
     tags: ["industrial", "trifásico", "motor"],
-    metaTitle: "Schneider iK60N C25 — Interruptor 3P 25A Curva C | ElektrK",
+    metaTitle: "Schneider iK60N C25 — Interruptor 3P 25A Curva C | D.E. MTY",
     metaDescription:
-      "Schneider Electric iK60N C25: interruptor tripolar 25A para protección de motores y equipos trifásicos. Disponible por pieza, caja o lote en ElektrK.",
+      "Schneider Electric iK60N C25: interruptor tripolar 25A para protección de motores y equipos trifásicos. Disponible por pieza, caja o lote en Distribuidor Electrico Monterrey.",
     variants: [
       {
         sku: "IK60N-C25-3P-PZA",
@@ -159,9 +159,9 @@ export const MOCK_PRODUCTS: Product[] = [
     datasheetUrl: "/datasheets/abb-s201-b6.pdf",
     featured: false,
     tags: ["control", "electrónica"],
-    metaTitle: "ABB S201-B6 — Interruptor 1P 6A Curva B | ElektrK",
+    metaTitle: "ABB S201-B6 — Interruptor 1P 6A Curva B | D.E. MTY",
     metaDescription:
-      "ABB S201-B6: interruptor termomagnético 6A Curva B, ideal para protección de circuitos electrónicos y de control. Precio por pieza o caja en ElektrK.",
+      "ABB S201-B6: interruptor termomagnético 6A Curva B, ideal para protección de circuitos electrónicos y de control. Precio por pieza o caja en Distribuidor Electrico Monterrey.",
     variants: [
       {
         sku: "S201-B6-PZA",
@@ -202,9 +202,9 @@ export const MOCK_PRODUCTS: Product[] = [
     datasheetUrl: "/datasheets/schneider-ik60n-d32.pdf",
     featured: false,
     tags: ["industrial", "motor", "compresor"],
-    metaTitle: "Schneider iK60N D32 — Interruptor 1P 32A Curva D | ElektrK",
+    metaTitle: "Schneider iK60N D32 — Interruptor 1P 32A Curva D | D.E. MTY",
     metaDescription:
-      "Schneider Electric iK60N D32: breaker monofásico 32A Curva D para compresores, motores y transformadores con altas corrientes de arranque. ElektrK.",
+      "Schneider Electric iK60N D32: breaker monofásico 32A Curva D para compresores, motores y transformadores con altas corrientes de arranque. Distribuidor Electrico Monterrey.",
     variants: [
       {
         sku: "IK60N-D32-1P-PZA",
@@ -237,9 +237,9 @@ export const MOCK_PRODUCTS: Product[] = [
     datasheetUrl: "/datasheets/siemens-5sl6432-7.pdf",
     featured: true,
     tags: ["industrial", "tetrapolar"],
-    metaTitle: "Siemens 5SL6432-7 — Interruptor 4P 32A Curva C | ElektrK",
+    metaTitle: "Siemens 5SL6432-7 — Interruptor 4P 32A Curva C | D.E. MTY",
     metaDescription:
-      "Siemens 5SL6432-7: interruptor tetrapolar 32A para instalaciones trifásicas con neutro. Disponible por pieza o lote en ElektrK con envío a tarifa plana.",
+      "Siemens 5SL6432-7: interruptor tetrapolar 32A para instalaciones trifásicas con neutro. Disponible por pieza o lote en Distribuidor Electrico Monterrey con envío a tarifa plana.",
     variants: [
       {
         sku: "5SL6432-7-PZA",
@@ -280,9 +280,9 @@ export const MOCK_PRODUCTS: Product[] = [
     datasheetUrl: "/datasheets/abb-s202-c20.pdf",
     featured: false,
     tags: ["residencial", "comercial"],
-    metaTitle: "ABB S202-C20 — Interruptor 2P 20A Curva C | ElektrK",
+    metaTitle: "ABB S202-C20 — Interruptor 2P 20A Curva C | D.E. MTY",
     metaDescription:
-      "ABB S202-C20: interruptor bipolar 20A Curva C de la gama S200. Diseño modular para riel DIN en instalaciones residenciales y comerciales. ElektrK.",
+      "ABB S202-C20: interruptor bipolar 20A Curva C de la gama S200. Diseño modular para riel DIN en instalaciones residenciales y comerciales. Distribuidor Electrico Monterrey.",
     variants: [
       {
         sku: "S202-C20-PZA",
@@ -323,9 +323,9 @@ export const MOCK_PRODUCTS: Product[] = [
     datasheetUrl: "/datasheets/schneider-ik60n-c63.pdf",
     featured: false,
     tags: ["industrial", "fuerza", "trifásico"],
-    metaTitle: "Schneider iK60N C63 — Interruptor 3P 63A Curva C | ElektrK",
+    metaTitle: "Schneider iK60N C63 — Interruptor 3P 63A Curva C | D.E. MTY",
     metaDescription:
-      "Schneider Electric iK60N C63: interruptor tripolar 63A para protección de circuitos de fuerza industrial. Disponible por pieza en ElektrK.",
+      "Schneider Electric iK60N C63: interruptor tripolar 63A para protección de circuitos de fuerza industrial. Disponible por pieza en Distribuidor Electrico Monterrey.",
     variants: [
       {
         sku: "IK60N-C63-3P-PZA",

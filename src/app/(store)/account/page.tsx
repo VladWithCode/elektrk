@@ -18,7 +18,7 @@ import { getMyAddresses } from "@/app/(store)/account/address-actions";
 export const metadata: Metadata = {
   title: "Mi cuenta",
   description:
-    "Gestiona tu perfil, consulta el historial de órdenes y accede a los tickets de soporte de tu cuenta ElektrK.",
+    "Gestiona tu perfil, consulta el historial de órdenes y accede a los tickets de soporte de tu cuenta de Distribuidor Electrico Monterrey.",
   robots: { index: false, follow: false },
 };
 
