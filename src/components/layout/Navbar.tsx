@@ -25,7 +25,6 @@ function NavbarAuthDesktop() {
   const { data: session, status } = useSession();
 
   if (status === "loading") {
-    // Skeleton to prevent layout shift while session loads
     return (
       <div className="h-8 w-24 rounded-md bg-muted/50 animate-pulse" />
     );
@@ -37,7 +36,7 @@ function NavbarAuthDesktop() {
         <Button variant="ghost" size="sm" asChild className="gap-2">
           <Link href="/account">
             <User className="h-3.5 w-3.5" />
-            <span className="max-w-[120px] truncate text-xs">
+            <span className="max-w-30 truncate text-xs">
               {session.user.name ?? session.user.email ?? "Mi cuenta"}
             </span>
           </Link>
@@ -109,9 +108,11 @@ export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/80 backdrop-blur-md supports-backdrop-filter:bg-background/60">
       <nav className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6 lg:px-8">
-        <BrandLogo />
+        <Link className="h-full" href="/">
+          <BrandLogo variant="short" />
+        </Link>
 
         {/* Desktop nav links */}
         <div className="hidden md:flex items-center gap-1 ml-4">

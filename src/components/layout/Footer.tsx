@@ -37,7 +37,11 @@ export async function Footer() {
         <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
-            <BrandLogo />
+            <div>
+              <Link href="/">
+                <BrandLogo />
+              </Link>
+            </div>
             <p className="mt-3 text-sm text-muted-foreground leading-relaxed max-w-xs">
               Distribuidor especializado de componentes eléctricos. Interruptores
               termomagnéticos y protecciones eléctricas industriales y residenciales.
