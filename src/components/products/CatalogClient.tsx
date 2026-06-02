@@ -18,10 +18,19 @@
 
 import { useMemo, useState, useTransition, useRef, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Loader2, SearchX, Sparkles } from "lucide-react";
+import { Loader2, SearchX, Sparkles, SlidersHorizontal } from "lucide-react";
 import { ProductGrid } from "@/components/products/ProductGrid";
 import { ProductFilters } from "@/components/products/ProductFilters";
 import { ProductSearch } from "@/components/products/ProductSearch";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { applyFilters } from "@/lib/filters";
 import type { Product, FilterState } from "@/types/product";
 import type { ProductFilterOptions } from "@/lib/repositories/products";
@@ -112,6 +121,18 @@ export function CatalogClient({ products, filterOptions }: CatalogClientProps) {
   // True when baseProducts is a fuzzy/server-filtered subset.
   const [isFuzzySearch, setIsFuzzySearch] = useState(false);
 
+  // Controls the filters modal. Products are shown immediately on load; the
+  // user opens this dialog only when they want to narrow the catalog.
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  // Count of active technical filters — shown as a badge on the trigger button.
+  const activeFilterCount =
+    filters.amperage.length +
+    filters.poles.length +
+    filters.voltage.length +
+    filters.tripCurve.length +
+    filters.brand.length;
+
   // Debounce timer for the search box.
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -199,18 +220,46 @@ export function CatalogClient({ products, filterOptions }: CatalogClientProps) {
 
   return (
     <>
-      {/* Search bar */}
-      <div className="mb-6 max-w-xl relative">
-        <ProductSearch
-          value={searchInput}
-          onChange={handleSearch}
-        />
-        {/* Spinner overlaid on the right side while pending */}
-        {isPending && (
-          <span className="absolute right-10 top-1/2 -translate-y-1/2 pointer-events-none">
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-          </span>
-        )}
+      {/* Search bar + filters trigger */}
+      <div className="mb-6 flex items-center gap-3">
+        <div className="relative flex-1 max-w-xl">
+          <ProductSearch
+            value={searchInput}
+            onChange={handleSearch}
+          />
+          {/* Spinner overlaid on the right side while pending */}
+          {isPending && (
+            <span className="absolute right-10 top-1/2 -translate-y-1/2 pointer-events-none">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            </span>
+          )}
+        </div>
+
+        <Dialog open={filtersOpen} onOpenChange={setFiltersOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" className="shrink-0 gap-2">
+              <SlidersHorizontal className="h-4 w-4" />
+              <span className="hidden sm:inline">Filtros</span>
+              {activeFilterCount > 0 && (
+                <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                  {activeFilterCount}
+                </Badge>
+              )}
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Filtrar productos</DialogTitle>
+            </DialogHeader>
+            <ProductFilters
+              filters={filters}
+              onChange={handleFiltersChange}
+              filterOptions={filterOptions}
+              totalCount={baseProducts.length}
+              filteredCount={filtered.length}
+            />
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Fuzzy search indicator */}
@@ -227,38 +276,25 @@ export function CatalogClient({ products, filterOptions }: CatalogClientProps) {
         </div>
       )}
 
-      <div className="flex flex-col lg:flex-row gap-8">
-        {/* Sidebar filters */}
-        <div className="w-full lg:w-56 shrink-0">
-          <ProductFilters
-            filters={filters}
-            onChange={handleFiltersChange}
-            filterOptions={filterOptions}
-            totalCount={baseProducts.length}
-            filteredCount={filtered.length}
-          />
-        </div>
-
-        {/* Product grid */}
-        <div className="flex-1 min-w-0">
-          {filtered.length === 0 && !isPending ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
-              <SearchX className="h-10 w-10 text-muted-foreground/40" />
-              <p className="text-sm font-medium text-muted-foreground">
-                {searchInput
-                  ? `Sin resultados para "${searchInput}"`
-                  : "Sin productos con los filtros seleccionados"}
+      {/* Product grid — full width; filters live in the modal above */}
+      <div className="min-w-0">
+        {filtered.length === 0 && !isPending ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
+            <SearchX className="h-10 w-10 text-muted-foreground/40" />
+            <p className="text-sm font-medium text-muted-foreground">
+              {searchInput
+                ? `Sin resultados para "${searchInput}"`
+                : "Sin productos con los filtros seleccionados"}
+            </p>
+            {searchInput && (
+              <p className="text-xs text-muted-foreground/70">
+                Prueba con otro término o verifica la ortografía.
               </p>
-              {searchInput && (
-                <p className="text-xs text-muted-foreground/70">
-                  Prueba con otro término o verifica la ortografía.
-                </p>
-              )}
-            </div>
-          ) : (
-            <ProductGrid products={filtered} />
-          )}
-        </div>
+            )}
+          </div>
+        ) : (
+          <ProductGrid products={filtered} />
+        )}
       </div>
     </>
   );
