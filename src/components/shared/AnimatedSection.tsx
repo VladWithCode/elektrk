@@ -45,10 +45,10 @@ export function AnimatedSection({
 
   return (
     <MotionEl
-      initial={shouldReduce ? { opacity: 1, y: 0 } : { opacity: 0, y }}
+      initial={{ opacity: 0, y }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-60px" }}
-      transition={{ duration: 0.45, delay, ease: "easeOut" }}
+      transition={{ duration: shouldReduce ? 0 : 0.45, delay: shouldReduce ? 0 : delay, ease: "easeOut" }}
       className={cn(className)}
     >
       {children}
@@ -73,9 +73,9 @@ export function FadeIn({
 
   return (
     <MotionEl
-      initial={shouldReduce ? { opacity: 1, y: 0 } : { opacity: 0, y }}
+      initial={{ opacity: 0, y }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, delay, ease: "easeOut" }}
+      transition={{ duration: shouldReduce ? 0 : 0.35, delay: shouldReduce ? 0 : delay, ease: "easeOut" }}
       className={cn(className)}
     >
       {children}
