@@ -59,6 +59,43 @@ const createInitialVariantHook: CollectionAfterChangeHook = async ({
 };
 
 // ---------------------------------------------------------------------------
+// beforeDelete hook — soft delete instead of hard delete
+// ---------------------------------------------------------------------------
+
+const softDeleteHook: CollectionBeforeDeleteHook = async ({
+  id,
+  req: { payload },
+}) => {
+  const now = new Date().toISOString();
+
+  try {
+    await payload.update({
+      collection: "products",
+      id,
+      data: { isDeleted: true, deletedAt: now },
+    });
+  } catch (error) {
+    console
+  }
+
+  const variants = await payload.find({
+    collection: "variants",
+    where: { product: { equals: id } },
+    limit: 0,
+  });
+
+  for (const variant of variants.docs) {
+    await payload.update({
+      collection: "variants",
+      id: variant.id,
+      data: { isDeleted: true, deletedAt: now },
+    });
+  }
+
+  throw new Error("Producto marcado como eliminado.");
+};
+
+// ---------------------------------------------------------------------------
 // Collection
 // ---------------------------------------------------------------------------
 
