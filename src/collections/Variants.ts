@@ -1,5 +1,5 @@
 import type { CollectionConfig } from "payload";
-import { isAdmin, isAdminOrActive } from "../lib/payload-access";
+import { isAdmin } from "../lib/payload-access";
 
 export const Variants: CollectionConfig = {
   slug: "variants",
@@ -11,7 +11,10 @@ export const Variants: CollectionConfig = {
     description: "Presentaciones de venta (pieza, caja, lote) de cada producto.",
   },
   access: {
-    read: isAdminOrActive,
+    read: ({ req }) => {
+      if (req.user?.collection === "admins") return true;
+      return { isActive: { equals: true }, isDeleted: { not_equals: true } };
+    },
     create: isAdmin,
     update: isAdmin,
     delete: isAdmin,
@@ -108,6 +111,28 @@ export const Variants: CollectionConfig = {
         description:
           "Desactivar para ocultar esta presentación sin eliminarla. " +
           "Las variantes inactivas no aparecen en el storefront.",
+      },
+    },
+    {
+      name: "isDeleted",
+      type: "checkbox",
+      label: "Eliminada (soft delete)",
+      defaultValue: false,
+      admin: {
+        description:
+          "Marcada como eliminada cuando el producto padre se elimina. " +
+          "Se conserva para el historial de órdenes.",
+        readOnly: true,
+      },
+    },
+    {
+      name: "deletedAt",
+      type: "date",
+      label: "Fecha de eliminación",
+      admin: {
+        description: "Fecha y hora en que se marcó como eliminada.",
+        readOnly: true,
+        condition: (data) => !!data.isDeleted,
       },
     },
   ],

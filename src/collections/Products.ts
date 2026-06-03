@@ -1,5 +1,5 @@
-import type { CollectionConfig, CollectionAfterChangeHook } from "payload";
-import { isAdmin, isAdminOrActive } from "../lib/payload-access";
+import type { CollectionConfig, CollectionAfterChangeHook, CollectionBeforeDeleteHook } from "payload";
+import { isAdmin } from "../lib/payload-access";
 
 // ---------------------------------------------------------------------------
 // Slug generation helper
@@ -68,15 +68,11 @@ const softDeleteHook: CollectionBeforeDeleteHook = async ({
 }) => {
   const now = new Date().toISOString();
 
-  try {
-    await payload.update({
-      collection: "products",
-      id,
-      data: { isDeleted: true, deletedAt: now },
-    });
-  } catch (error) {
-    console
-  }
+  await payload.update({
+    collection: "products",
+    id,
+    data: { isDeleted: true, deletedAt: now },
+  });
 
   const variants = await payload.find({
     collection: "variants",
@@ -91,8 +87,6 @@ const softDeleteHook: CollectionBeforeDeleteHook = async ({
       data: { isDeleted: true, deletedAt: now },
     });
   }
-
-  throw new Error("Producto marcado como eliminado.");
 };
 
 // ---------------------------------------------------------------------------
@@ -109,7 +103,10 @@ export const Products: CollectionConfig = {
     description: "Catálogo de interruptores termomagnéticos y componentes eléctricos.",
   },
   access: {
-    read: isAdminOrActive,
+    read: ({ req }) => {
+      if (req.user?.collection === "admins") return true;
+      return { isActive: { equals: true }, isDeleted: { not_equals: true } };
+    },
     create: isAdmin,
     update: isAdmin,
     delete: isAdmin,
@@ -118,7 +115,6 @@ export const Products: CollectionConfig = {
   hooks: {
     beforeChange: [
       ({ data }) => {
-        // Auto-generate slug from name when creating without an explicit slug
         if (!data.slug && typeof data.name === "string" && data.name.trim()) {
           data.slug = slugifyText(data.name);
         }
@@ -126,6 +122,7 @@ export const Products: CollectionConfig = {
       },
     ],
     afterChange: [createInitialVariantHook],
+    beforeDelete: [softDeleteHook],
   },
   fields: [
     // -------------------------------------------------------------------------
@@ -406,7 +403,30 @@ export const Products: CollectionConfig = {
               label: "Destacado en home",
               defaultValue: false,
               admin: {
-                description: "Aparece en la sección 'Productos destacados' de la página de inicio.",
+                description:
+                  "Aparece en la sección 'Productos destacados' de la página de inicio.",
+              },
+            },
+            {
+              name: "isDeleted",
+              type: "checkbox",
+              label: "Eliminado (soft delete)",
+              defaultValue: false,
+              admin: {
+                description:
+                  "Marcado como eliminado. El producto y sus variantes se ocultan del storefront " +
+                  "pero se conservan para el historial de órdenes.",
+                readOnly: true,
+              },
+            },
+            {
+              name: "deletedAt",
+              type: "date",
+              label: "Fecha de eliminación",
+              admin: {
+                description: "Fecha y hora en que se marcó como eliminado.",
+                readOnly: true,
+                condition: (data) => !!data.isDeleted,
               },
             },
           ],

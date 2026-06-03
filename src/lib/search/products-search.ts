@@ -110,6 +110,7 @@ export async function searchProductsByTrigram(
     FROM products p
     WHERE
       p.is_active = true
+      AND (p.is_deleted IS NULL OR p.is_deleted = false)
       AND (
         p.name                              ILIKE '%' || $1 || '%'
         OR p.brand                          ILIKE '%' || $1 || '%'
@@ -121,6 +122,7 @@ export async function searchProductsByTrigram(
           SELECT 1 FROM variants v
           WHERE  v.product_id = p.id
             AND  v.is_active  = true
+            AND  (v.is_deleted IS NULL OR v.is_deleted = false)
             AND  v.sku        ILIKE '%' || $1 || '%'
         )
         ${useTrigram ? TRGM_WHERE : ""}

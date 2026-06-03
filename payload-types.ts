@@ -322,6 +322,14 @@ export interface Product {
    */
   featured?: boolean | null;
   /**
+   * Marcado como eliminado. El producto y sus variantes se ocultan del storefront pero se conservan para el historial de órdenes.
+   */
+  isDeleted?: boolean | null;
+  /**
+   * Fecha y hora en que se marcó como eliminado.
+   */
+  deletedAt?: string | null;
+  /**
    * Activa esta opción para crear automáticamente la primera variante de venta al guardar el producto. Se desactiva solo después de crearla. Si ya existe una variante con el mismo SKU, se omite.
    */
   createInitialVariant?: boolean | null;
@@ -378,6 +386,14 @@ export interface Variant {
    * Desactivar para ocultar esta presentación sin eliminarla. Las variantes inactivas no aparecen en el storefront.
    */
   isActive?: boolean | null;
+  /**
+   * Marcada como eliminada cuando el producto padre se elimina. Se conserva para el historial de órdenes.
+   */
+  isDeleted?: boolean | null;
+  /**
+   * Fecha y hora en que se marcó como eliminada.
+   */
+  deletedAt?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -759,6 +775,8 @@ export interface ProductsSelect<T extends boolean = true> {
   metaImage?: T;
   isActive?: T;
   featured?: T;
+  isDeleted?: T;
+  deletedAt?: T;
   createInitialVariant?: T;
   initialVariantSku?: T;
   initialVariantSaleType?: T;
@@ -780,6 +798,8 @@ export interface VariantsSelect<T extends boolean = true> {
   price?: T;
   stock?: T;
   isActive?: T;
+  isDeleted?: T;
+  deletedAt?: T;
   updatedAt?: T;
   createdAt?: T;
 }

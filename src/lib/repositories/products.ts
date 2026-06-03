@@ -111,7 +111,12 @@ export async function getProducts(filters?: Partial<FilterState>): Promise<Produ
     const payload = await getPayloadClient();
     const result = await payload.find({
       collection: "products",
-      where: { isActive: { equals: true } },
+      where: {
+        and: [
+          { isActive: { equals: true } },
+          { isDeleted: { not_equals: true } },
+        ],
+      },
       depth: 1,
       limit: 500,
     });
@@ -161,6 +166,7 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
         and: [
           { slug: { equals: slug } },
           { isActive: { equals: true } },
+          { isDeleted: { not_equals: true } },
         ],
       },
       depth: 1,
@@ -189,6 +195,7 @@ export async function getFeaturedProducts(limit = 4): Promise<Product[]> {
         and: [
           { featured: { equals: true } },
           { isActive: { equals: true } },
+          { isDeleted: { not_equals: true } },
         ],
       },
       depth: 1,
@@ -213,7 +220,12 @@ export async function getProductFilters(): Promise<ProductFilterOptions> {
     const payload = await getPayloadClient();
     const result = await payload.find({
       collection: "products",
-      where: { isActive: { equals: true } },
+      where: {
+        and: [
+          { isActive: { equals: true } },
+          { isDeleted: { not_equals: true } },
+        ],
+      },
       depth: 0,
       limit: 500,
       select: { brand: true, amperage: true, poles: true, voltage: true, tripCurve: true },
@@ -298,6 +310,7 @@ export async function searchProducts(query: string): Promise<Product[]> {
       where: {
         and: [
           { isActive: { equals: true } },
+          { isDeleted: { not_equals: true } },
           {
             or: [
               { name: { like: q } },
@@ -329,6 +342,7 @@ export async function searchProducts(query: string): Promise<Product[]> {
       and: [
         { id: { in: numericIds } },
         { isActive: { equals: true } },
+        { isDeleted: { not_equals: true } },
       ],
     },
     depth: 1,
@@ -359,7 +373,12 @@ export async function getAllProductSlugs(): Promise<string[]> {
     const payload = await getPayloadClient();
     const result = await payload.find({
       collection: "products",
-      where: { isActive: { equals: true } },
+      where: {
+        and: [
+          { isActive: { equals: true } },
+          { isDeleted: { not_equals: true } },
+        ],
+      },
       depth: 0,
       limit: 1000,
       select: { slug: true },
