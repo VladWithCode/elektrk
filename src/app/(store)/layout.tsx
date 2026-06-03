@@ -46,7 +46,7 @@ const geistMono = Geist_Mono({
  */
 export const metadata: Metadata = {
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SERVER_URL ?? "http://localhost:3000"
+    process.env.NEXT_PUBLIC_SERVER_URL || "http://localhost:3000",
   ),
   title: {
     default: "D.E. MTY — Componentes Eléctricos",
@@ -83,7 +83,7 @@ export default async function StoreRootLayout({
         "h-full antialiased",
         geistMono.variable,
         montserrat.variable,
-        manropeHeading.variable
+        manropeHeading.variable,
       )}
     >
       <head>
