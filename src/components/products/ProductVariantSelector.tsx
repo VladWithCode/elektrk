@@ -21,10 +21,22 @@ interface ProductVariantSelectorProps {
 
 export function ProductVariantSelector({ product }: ProductVariantSelectorProps) {
   const { addItem } = useCart();
-  const [selectedVariant, setSelectedVariant] = useState<ProductVariant>(
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | undefined>(
     product.variants[0]
   );
   const [qty, setQty] = useState(1);
+
+  // A product can exist without any (active) variants — e.g. just created in the
+  // admin before its presentaciones are added. Without a variant there is no
+  // price, SKU or stock to show, so render a graceful notice instead of crashing
+  // on `selectedVariant.price`.
+  if (!selectedVariant) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Este producto aún no tiene presentaciones disponibles para la venta.
+      </p>
+    );
+  }
 
   const handleAdd = () => {
     if (selectedVariant.stock === 0) return;
