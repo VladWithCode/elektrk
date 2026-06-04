@@ -46,3 +46,6 @@ next-env.d.ts
 
 # editor
 .editorconfig
+
+# Media
+/public/media
