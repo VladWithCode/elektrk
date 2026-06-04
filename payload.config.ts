@@ -2,6 +2,7 @@ import { buildConfig } from "payload";
 import { postgresAdapter } from "@payloadcms/db-postgres";
 import { lexicalEditor } from "@payloadcms/richtext-lexical";
 import { resendAdapter } from "@payloadcms/email-resend";
+import { uploadthingStorage } from "@payloadcms/storage-uploadthing";
 import { en } from "@payloadcms/translations/languages/en";
 import { es } from "@payloadcms/translations/languages/es";
 import sharp from "sharp";
@@ -89,6 +90,20 @@ export default buildConfig({
   // focal-point crops, etc.). Without it Payload logs a warning on every build
   // and disables image optimisation in the admin media library.
   sharp,
+
+  plugins: [
+    uploadthingStorage({
+      enabled: Boolean(process.env.UPLOADTHING_TOKEN),
+      collections: {
+        media: true,
+      },
+      clientUploads: true,
+      options: {
+        token: process.env.UPLOADTHING_TOKEN,
+        acl: "public-read",
+      },
+    }),
+  ],
 
   i18n: {
     supportedLanguages: { en, es },
