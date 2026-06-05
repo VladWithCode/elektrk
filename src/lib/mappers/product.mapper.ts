@@ -144,13 +144,43 @@ export function mapPayloadProduct(p: PayloadProduct): Product {
 // ---------------------------------------------------------------------------
 
 /**
+ * Normalises a media URL for use as a `next/image` src.
+ *
+ * Payload serialises Media.url as an ABSOLUTE URL built from `serverURL`
+ * (e.g. "http://localhost:3000/api/media/file/foo.png"). Next.js 16's image
+ * optimizer rejects absolute upstreams that resolve to a private/loopback IP
+ * (SSRF guard) → the request 400s and the image never renders.
+ *
+ * Fix: when the URL points at this app's own media route, strip the origin and
+ * return a same-origin RELATIVE path. The optimizer then fetches it locally
+ * (no private-IP block) and it stays correct across every deploy host.
+ * Genuinely remote CDN URLs (e.g. UploadThing's utfs.io / *.ufs.sh) are left
+ * absolute so `images.remotePatterns` handles them.
+ */
+function toClientMediaUrl(url: string): string {
+  if (!url) return url;
+  // Already relative — nothing to do.
+  if (url.startsWith("/")) return url;
+  try {
+    const parsed = new URL(url);
+    // Payload's own file-serving routes are same-origin with the Next app.
+    if (parsed.pathname.startsWith("/api/media/") || parsed.pathname.startsWith("/media/")) {
+      return parsed.pathname + parsed.search;
+    }
+    return url; // remote CDN (UploadThing, S3, …) — keep absolute
+  } catch {
+    return url; // not a parseable absolute URL — return as-is
+  }
+}
+
+/**
  * Resolves a Payload media reference to a URL string.
  * Returns null when the ref is a bare ID (not populated), null, or undefined.
  */
 function resolveMediaUrl(ref: PayloadMediaRef | string | null | undefined): string | null {
   if (!ref) return null;
   if (typeof ref === "string") return null; // bare ID — caller used depth=0
-  return ref.url ?? null;
+  return ref.url ? toClientMediaUrl(ref.url) : null;
 }
 
 interface ResolvedMediaDoc {
@@ -171,7 +201,7 @@ function resolveMediaDoc(
   if (typeof ref === "string") return null; // bare ID — not populated
   if (!ref.url) return null;
   return {
-    url: ref.url,
+    url: toClientMediaUrl(ref.url),
     filename: ref.filename ?? null,
     mimeType: ref.mimeType ?? null,
   };
