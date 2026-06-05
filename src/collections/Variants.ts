@@ -1,5 +1,15 @@
-import type { CollectionConfig } from "payload";
+import type { CollectionConfig, CollectionBeforeChangeHook } from "payload";
 import { isAdmin } from "../lib/payload-access";
+
+const syncDeletedFields: CollectionBeforeChangeHook = ({ data }) => {
+  if (data.deletedAt && !data.isDeleted) {
+    data.isDeleted = true;
+  }
+  if (!data.deletedAt && data.isDeleted) {
+    data.isDeleted = false;
+  }
+  return data;
+};
 
 export const Variants: CollectionConfig = {
   slug: "variants",
@@ -18,6 +28,10 @@ export const Variants: CollectionConfig = {
     create: isAdmin,
     update: isAdmin,
     delete: isAdmin,
+  },
+  trash: true,
+  hooks: {
+    beforeChange: [syncDeletedFields],
   },
   fields: [
     {

@@ -1,4 +1,4 @@
-import type { CollectionConfig, CollectionAfterChangeHook, CollectionBeforeDeleteHook } from "payload";
+import type { CollectionConfig, CollectionAfterChangeHook } from "payload";
 import { isAdmin } from "../lib/payload-access";
 
 // ---------------------------------------------------------------------------
@@ -59,24 +59,27 @@ const createInitialVariantHook: CollectionAfterChangeHook = async ({
 };
 
 // ---------------------------------------------------------------------------
-// beforeDelete hook — soft delete instead of hard delete
+// afterChange hook — cascade soft delete / restore to variants
 // ---------------------------------------------------------------------------
 
-const softDeleteHook: CollectionBeforeDeleteHook = async ({
-  id,
-  req: { payload },
+const cascadeSoftDeleteToVariants: CollectionAfterChangeHook = async ({
+  doc,
+  previousDoc,
+  operation,
+  req,
 }) => {
-  const now = new Date().toISOString();
+  if (operation !== "update" || !previousDoc) return doc;
 
-  await payload.update({
-    collection: "products",
-    id,
-    data: { isDeleted: true, deletedAt: now },
-  });
+  const wasTrashed = !!previousDoc.deletedAt;
+  const isTrashed = !!doc.deletedAt;
+
+  if (wasTrashed === isTrashed) return doc;
+
+  const { payload } = req;
 
   const variants = await payload.find({
     collection: "variants",
-    where: { product: { equals: id } },
+    where: { product: { equals: doc.id } },
     limit: 0,
   });
 
@@ -84,9 +87,15 @@ const softDeleteHook: CollectionBeforeDeleteHook = async ({
     await payload.update({
       collection: "variants",
       id: variant.id,
-      data: { isDeleted: true, deletedAt: now },
+      data: {
+        isDeleted: isTrashed,
+        deletedAt: isTrashed ? doc.deletedAt : null,
+      },
+      req,
     });
   }
+
+  return doc;
 };
 
 // ---------------------------------------------------------------------------
@@ -112,17 +121,24 @@ export const Products: CollectionConfig = {
     delete: isAdmin,
   },
   timestamps: true,
+  trash: true,
   hooks: {
     beforeChange: [
       ({ data }) => {
         if (!data.slug && typeof data.name === "string" && data.name.trim()) {
           data.slug = slugifyText(data.name);
         }
+        // Keep isDeleted in sync with deletedAt for trash support
+        if (data.deletedAt && !data.isDeleted) {
+          data.isDeleted = true;
+        }
+        if (!data.deletedAt && data.isDeleted) {
+          data.isDeleted = false;
+        }
         return data;
       },
     ],
-    afterChange: [createInitialVariantHook],
-    beforeDelete: [softDeleteHook],
+    afterChange: [createInitialVariantHook, cascadeSoftDeleteToVariants],
   },
   fields: [
     // -------------------------------------------------------------------------
