@@ -1,9 +1,11 @@
 import type { CollectionConfig } from "payload";
 import { isAdmin } from "../lib/payload-access";
+import { guardMediaDelete } from "../lib/payload-delete-guards";
 
 export const Media: CollectionConfig = {
   slug: "media",
   labels: { singular: "Archivo", plural: "Archivos" },
+  trash: true,
   upload: {
     staticDir: "public/media",
     // Payload Admin (list, detail preview, and the upload/relationship field
@@ -59,6 +61,24 @@ export const Media: CollectionConfig = {
     update: isAdmin,
     delete: isAdmin,
   },
+  hooks: {
+    beforeChange: [
+      ({ data }) => {
+        if (data.deletedAt && !data.isDeleted) {
+          data.isDeleted = true;
+        }
+        if (!data.deletedAt && data.isDeleted) {
+          data.isDeleted = false;
+        }
+        return data;
+      },
+    ],
+    beforeDelete: [
+      async ({ id, req }) => {
+        await guardMediaDelete(req, id);
+      },
+    ],
+  },
   fields: [
     {
       name: "alt",
@@ -94,6 +114,27 @@ export const Media: CollectionConfig = {
         description:
           "Usado por el filtro de relaciones en Productos para mostrar solo el tipo correcto " +
           "en cada campo (imágenes → image, ficha técnica → datasheet, meta → og-image).",
+      },
+    },
+    {
+      name: "isDeleted",
+      type: "checkbox",
+      label: "Eliminado (soft delete)",
+      defaultValue: false,
+      admin: {
+        description:
+          "Marcado como eliminado. El archivo se oculta del storefront pero se conserva en la base de datos.",
+        readOnly: true,
+      },
+    },
+    {
+      name: "deletedAt",
+      type: "date",
+      label: "Fecha de eliminación",
+      admin: {
+        description: "Fecha y hora en que se marcó como eliminado.",
+        readOnly: true,
+        condition: (data) => !!data.isDeleted,
       },
     },
   ],

@@ -1,5 +1,6 @@
 import type { CollectionConfig } from "payload";
 import { isAdmin } from "../lib/payload-access";
+import { guardOrderDelete } from "../lib/payload-delete-guards";
 
 export const Orders: CollectionConfig = {
   slug: "orders",
@@ -20,6 +21,13 @@ export const Orders: CollectionConfig = {
     delete: isAdmin,
   },
   timestamps: true,
+  hooks: {
+    beforeDelete: [
+      async ({ id, req }) => {
+        await guardOrderDelete(req, id);
+      },
+    ],
+  },
   fields: [
     // -------------------------------------------------------------------------
     // Group: Cliente

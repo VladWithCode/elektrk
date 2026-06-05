@@ -115,4 +115,30 @@ export default buildConfig({
     supportedLanguages: { en, es },
     fallbackLanguage: "es",
   },
+
+  hooks: {
+    afterError: [
+      ({ error }) => {
+        // Detectar violaciones de foreign key de Postgres (SQLSTATE 23503)
+        if (
+          (error as any)?.code === "23503" ||
+          error?.message?.includes("foreign key constraint")
+        ) {
+          return {
+            response: {
+              errors: [
+                {
+                  message:
+                    "No se puede eliminar este documento porque otros registros aún lo utilizan. Elimina las referencias primero.",
+                },
+              ],
+            },
+            status: 409,
+          };
+        }
+        // Otros errores: no interceptar, dejar que Payload maneje normalmente
+        return undefined;
+      },
+    ],
+  },
 });

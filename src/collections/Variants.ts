@@ -1,5 +1,6 @@
 import type { CollectionConfig, CollectionBeforeChangeHook } from "payload";
 import { isAdmin } from "../lib/payload-access";
+import { guardVariantDelete } from "../lib/payload-delete-guards";
 
 const syncDeletedFields: CollectionBeforeChangeHook = ({ data }) => {
   if (data.deletedAt && !data.isDeleted) {
@@ -32,6 +33,11 @@ export const Variants: CollectionConfig = {
   trash: true,
   hooks: {
     beforeChange: [syncDeletedFields],
+    beforeDelete: [
+      async ({ id, req }) => {
+        await guardVariantDelete(req, id);
+      },
+    ],
   },
   fields: [
     {

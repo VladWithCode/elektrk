@@ -1,5 +1,6 @@
 import { type CollectionConfig, type CollectionAfterChangeHook, APIError } from "payload";
 import { isAdmin } from "../lib/payload-access";
+import { guardProductDelete } from "../lib/payload-delete-guards";
 
 // ---------------------------------------------------------------------------
 // Slug generation helper
@@ -162,6 +163,11 @@ export const Products: CollectionConfig = {
           data.isDeleted = false;
         }
         return data;
+      },
+    ],
+    beforeDelete: [
+      async ({ id, req }) => {
+        await guardProductDelete(req, id);
       },
     ],
     afterChange: [createInitialVariantHook, cascadeSoftDeleteToVariants],
