@@ -1,4 +1,5 @@
 import type { CollectionConfig, CollectionAfterChangeHook, CollectionBeforeDeleteHook } from "payload";
+import { APIError } from "payload";
 import { isAdmin } from "../lib/payload-access";
 
 // ---------------------------------------------------------------------------
@@ -22,38 +23,63 @@ function slugifyText(text: string): string {
 
 const createInitialVariantHook: CollectionAfterChangeHook = async ({
   doc,
-  req: { payload },
+  operation,
+  req,
 }) => {
+  if (operation !== "create") return doc;
   if (!doc.createInitialVariant) return doc;
-  if (!doc.initialVariantSku || !doc.initialVariantSaleType) return doc;
+  if (req.context?.skipInitialVariantHook) return doc;
 
-  // Skip if a variant with the same SKU already exists
+  const { payload } = req;
+
+  const sku = typeof doc.initialVariantSku === "string" ? doc.initialVariantSku.trim() : "";
+  const saleType = doc.initialVariantSaleType as "piece" | "box" | "lot" | undefined;
+  const unitsPerPackage = Number(doc.initialVariantUnitsPerPackage ?? 1);
+  const price = Number(doc.initialVariantPrice ?? 0);
+  const stock = Number(doc.initialVariantStock ?? 0);
+
+  if (!sku) throw new APIError("SKU de la variante inicial requerido.", 400);
+  if (!saleType || !["piece", "box", "lot"].includes(saleType)) {
+    throw new APIError("Tipo de presentación de la variante inicial inválido.", 400);
+  }
+  if (!Number.isFinite(price) || price < 0) {
+    throw new APIError("Precio de la variante inicial debe ser >= 0.", 400);
+  }
+  if (!Number.isFinite(stock) || stock < 0) {
+    throw new APIError("Stock de la variante inicial debe ser >= 0.", 400);
+  }
+  if (!Number.isFinite(unitsPerPackage) || unitsPerPackage < 1) {
+    throw new APIError("Unidades por empaque debe ser >= 1.", 400);
+  }
+
   const existing = await payload.find({
     collection: "variants",
-    where: { sku: { equals: doc.initialVariantSku } },
+    where: { sku: { equals: sku } },
     limit: 1,
+    req,
   });
-  if (existing.totalDocs > 0) return doc;
+  if (existing.totalDocs > 0) {
+    throw new APIError(`Ya existe una variante con SKU "${sku}".`, 400);
+  }
 
-  await payload.create({
-    collection: "variants",
-    data: {
-      product: doc.id,
-      sku: doc.initialVariantSku as string,
-      saleType: doc.initialVariantSaleType as "piece" | "box" | "lot",
-      unitsPerPackage: (doc.initialVariantUnitsPerPackage as number) ?? 1,
-      price: (doc.initialVariantPrice as number) ?? 0,
-      stock: (doc.initialVariantStock as number) ?? 0,
-      isActive: true,
-    },
-  });
-
-  // Clear the flag so re-saves don't re-create
-  await payload.update({
-    collection: "products",
-    id: doc.id,
-    data: { createInitialVariant: false },
-  });
+  try {
+    await payload.create({
+      collection: "variants",
+      data: {
+        product: doc.id,
+        sku,
+        saleType,
+        unitsPerPackage,
+        price,
+        stock,
+        isActive: true,
+      },
+      req,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Error desconocido";
+    throw new APIError(`No se pudo crear la variante inicial: ${msg}`, 400);
+  }
 
   return doc;
 };
@@ -62,22 +88,22 @@ const createInitialVariantHook: CollectionAfterChangeHook = async ({
 // beforeDelete hook — soft delete instead of hard delete
 // ---------------------------------------------------------------------------
 
-const softDeleteHook: CollectionBeforeDeleteHook = async ({
-  id,
-  req: { payload },
-}) => {
+const softDeleteHook: CollectionBeforeDeleteHook = async ({ id, req }) => {
+  const { payload } = req;
   const now = new Date().toISOString();
 
   await payload.update({
     collection: "products",
     id,
     data: { isDeleted: true, deletedAt: now },
+    req,
   });
 
   const variants = await payload.find({
     collection: "variants",
     where: { product: { equals: id } },
     limit: 0,
+    req,
   });
 
   for (const variant of variants.docs) {
@@ -85,6 +111,7 @@ const softDeleteHook: CollectionBeforeDeleteHook = async ({
       collection: "variants",
       id: variant.id,
       data: { isDeleted: true, deletedAt: now },
+      req,
     });
   }
 };
