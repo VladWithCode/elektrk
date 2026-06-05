@@ -1,4 +1,4 @@
-import type { CollectionConfig, CollectionAfterChangeHook } from "payload";
+import { type CollectionConfig, type CollectionAfterChangeHook, APIError } from "payload";
 import { isAdmin } from "../lib/payload-access";
 
 // ---------------------------------------------------------------------------
