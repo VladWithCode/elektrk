@@ -171,6 +171,124 @@ export default buildConfig({
           };
         }
 
+        // Detectar errores de upload (tamaño, tipo, procesamiento, UploadThing)
+        const errorMsg = error?.message?.toLowerCase() ?? "";
+        if (
+          errorMsg.includes("file size limit has been reached") ||
+          errorMsg.includes("request entity too large") ||
+          errorMsg.includes("payload too large")
+        ) {
+          return {
+            response: {
+              errors: [
+                {
+                  message:
+                    "El archivo excede el límite de 10 MB. Sube un archivo más pequeño.",
+                },
+              ],
+            },
+            status: 413,
+          };
+        }
+        if (
+          errorMsg.includes("file type") &&
+          (errorMsg.includes("not allowed") ||
+            errorMsg.includes("restricted file type"))
+        ) {
+          return {
+            response: {
+              errors: [
+                {
+                  message:
+                    "Tipo de archivo no permitido. Solo se aceptan imágenes (JPEG, PNG, WebP, SVG) y PDFs.",
+                },
+              ],
+            },
+            status: 400,
+          };
+        }
+        if (errorMsg.includes("invalid mime type")) {
+          return {
+            response: {
+              errors: [
+                {
+                  message:
+                    "Tipo de archivo no permitido. Solo se aceptan imágenes (JPEG, PNG, WebP, SVG) y PDFs.",
+                },
+              ],
+            },
+            status: 400,
+          };
+        }
+        if (errorMsg.includes("svg file contains potentially harmful content")) {
+          return {
+            response: {
+              errors: [
+                {
+                  message:
+                    "El archivo SVG contiene contenido potencialmente peligroso. Verifica el archivo.",
+                },
+              ],
+            },
+            status: 400,
+          };
+        }
+        if (
+          errorMsg.includes("invalid pdf") ||
+          errorMsg.includes("invalid or corrupted pdf")
+        ) {
+          return {
+            response: {
+              errors: [
+                {
+                  message:
+                    "El archivo PDF está corrupto o es inválido. Verifica el archivo.",
+                },
+              ],
+            },
+            status: 400,
+          };
+        }
+        if (errorMsg.includes("error uploading file with uploadthing")) {
+          return {
+            response: {
+              errors: [
+                {
+                  message:
+                    "Error al subir el archivo al servidor. Inténtalo de nuevo o contacta soporte.",
+                },
+              ],
+            },
+            status: 500,
+          };
+        }
+        if (errorMsg.includes("error uploading file")) {
+          return {
+            response: {
+              errors: [
+                {
+                  message:
+                    "Error al subir el archivo. Inténtalo de nuevo o contacta soporte.",
+                },
+              ],
+            },
+            status: 500,
+          };
+        }
+        if (errorMsg.includes("sharp")) {
+          return {
+            response: {
+              errors: [
+                {
+                  message:
+                    "Error al procesar la imagen. Verifica que el archivo no esté corrupto.",
+                },
+              ],
+            },
+            status: 400,
+          };
+        }
+
         // Otros errores: no interceptar, dejar que Payload maneje normalmente
         return undefined;
       },
