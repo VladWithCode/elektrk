@@ -118,7 +118,7 @@ export default buildConfig({
 
   hooks: {
     afterError: [
-      ({ error }) => {
+      ({ error, collection }) => {
         // Detectar violaciones de foreign key de Postgres (SQLSTATE 23503)
         if (
           (error as any)?.code === "23503" ||
@@ -136,6 +136,41 @@ export default buildConfig({
             status: 409,
           };
         }
+
+        // Detectar violaciones de unique constraint de Postgres (SQLSTATE 23505)
+        if (
+          (error as any)?.code === "23505" ||
+          error?.message?.includes("duplicate key") ||
+          error?.message?.includes("unique constraint")
+        ) {
+          const collectionName = collection?.slug;
+          let message: string;
+          switch (collectionName) {
+            case "products":
+              message =
+                "Ya existe un producto con ese mismo slug. Usa un slug diferente.";
+              break;
+            case "variants":
+              message =
+                "Ya existe una variante con ese mismo SKU. Usa un SKU diferente.";
+              break;
+            case "admins":
+              message =
+                "Ya existe un administrador con ese mismo email. Usa un email diferente.";
+              break;
+            default:
+              message =
+                "Ya existe un registro con ese mismo valor. Verifica que no estés duplicando un slug, SKU o email.";
+              break;
+          }
+          return {
+            response: {
+              errors: [{ message }],
+            },
+            status: 409,
+          };
+        }
+
         // Otros errores: no interceptar, dejar que Payload maneje normalmente
         return undefined;
       },

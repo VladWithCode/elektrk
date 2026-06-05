@@ -1,6 +1,7 @@
-import { type CollectionConfig, type CollectionAfterChangeHook, APIError } from "payload";
+import { type CollectionConfig, type CollectionAfterChangeHook, type CollectionBeforeChangeHook, APIError } from "payload";
 import { isAdmin } from "../lib/payload-access";
 import { guardProductDelete } from "../lib/payload-delete-guards";
+import { guardUniqueSlug } from "../lib/payload-unique-guards";
 
 // ---------------------------------------------------------------------------
 // Slug generation helper
@@ -162,6 +163,13 @@ export const Products: CollectionConfig = {
         if (!data.deletedAt && data.isDeleted) {
           data.isDeleted = false;
         }
+        return data;
+      },
+      async ({ data, originalDoc, operation, req }) => {
+        const slug = typeof data.slug === "string" ? data.slug.trim() : "";
+        if (!slug) return data;
+        const currentId = operation === "update" ? originalDoc?.id : undefined;
+        await guardUniqueSlug(req, slug, currentId);
         return data;
       },
     ],

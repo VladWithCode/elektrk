@@ -187,6 +187,16 @@ export interface Media {
    * Usado por el filtro de relaciones en Productos para mostrar solo el tipo correcto en cada campo (imágenes → image, ficha técnica → datasheet, meta → og-image).
    */
   documentType: 'image' | 'datasheet' | 'og-image' | 'document';
+  /**
+   * Marcado como eliminado. El archivo se oculta del storefront pero se conserva en la base de datos.
+   */
+  isDeleted?: boolean | null;
+  /**
+   * Fecha y hora en que se marcó como eliminado.
+   */
+  deletedAt?: string | null;
+  _key?: string | null;
+  prefix?: string | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -200,6 +210,7 @@ export interface Media {
   focalY?: number | null;
   sizes?: {
     thumbnail?: {
+      _key?: string | null;
       url?: string | null;
       width?: number | null;
       height?: number | null;
@@ -208,6 +219,7 @@ export interface Media {
       filename?: string | null;
     };
     card?: {
+      _key?: string | null;
       url?: string | null;
       width?: number | null;
       height?: number | null;
@@ -325,9 +337,6 @@ export interface Product {
    * Marcado como eliminado. El producto y sus variantes se ocultan del storefront pero se conservan para el historial de órdenes.
    */
   isDeleted?: boolean | null;
-  /**
-   * Fecha y hora en que se marcó como eliminado.
-   */
   deletedAt?: string | null;
   /**
    * Activa esta opción para crear automáticamente la primera variante de venta al guardar el producto. Se desactiva solo después de crearla. Si ya existe una variante con el mismo SKU, se omite.
@@ -702,6 +711,10 @@ export interface MediaSelect<T extends boolean = true> {
   alt?: T;
   caption?: T;
   documentType?: T;
+  isDeleted?: T;
+  deletedAt?: T;
+  _key?: T;
+  prefix?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;
@@ -719,6 +732,7 @@ export interface MediaSelect<T extends boolean = true> {
         thumbnail?:
           | T
           | {
+              _key?: T;
               url?: T;
               width?: T;
               height?: T;
@@ -729,6 +743,7 @@ export interface MediaSelect<T extends boolean = true> {
         card?:
           | T
           | {
+              _key?: T;
               url?: T;
               width?: T;
               height?: T;

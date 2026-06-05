@@ -1,6 +1,7 @@
 import type { CollectionConfig, CollectionBeforeChangeHook } from "payload";
 import { isAdmin } from "../lib/payload-access";
 import { guardVariantDelete } from "../lib/payload-delete-guards";
+import { guardUniqueSku } from "../lib/payload-unique-guards";
 
 const syncDeletedFields: CollectionBeforeChangeHook = ({ data }) => {
   if (data.deletedAt && !data.isDeleted) {
@@ -32,7 +33,16 @@ export const Variants: CollectionConfig = {
   },
   trash: true,
   hooks: {
-    beforeChange: [syncDeletedFields],
+    beforeChange: [
+      syncDeletedFields,
+      async ({ data, originalDoc, operation, req }) => {
+        const sku = typeof data.sku === "string" ? data.sku.trim() : "";
+        if (!sku) return data;
+        const currentId = operation === "update" ? originalDoc?.id : undefined;
+        await guardUniqueSku(req, sku, currentId);
+        return data;
+      },
+    ],
     beforeDelete: [
       async ({ id, req }) => {
         await guardVariantDelete(req, id);
@@ -61,8 +71,6 @@ export const Variants: CollectionConfig = {
         description:
           "Código único de referencia. Debe ser único en todo el catálogo. " +
           "Ej. SIEM-5SL6110-7-PIE, SIEM-5SL6110-7-CAJ12. " +
-          // TODO (Fase 5): agregar hook beforeChange que verifique unicidad de SKU
-          // en la misma collection y lance un error claro si ya existe.
           "Cambiar el SKU después de crear órdenes puede romper los snapshots históricos.",
       },
     },
