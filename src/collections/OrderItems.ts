@@ -1,5 +1,14 @@
-import type { CollectionConfig } from "payload";
+import type { CollectionConfig, CollectionBeforeValidateHook } from "payload";
 import { isAdmin } from "../lib/payload-access";
+import { validateNumber } from "../lib/payload-validation-guards";
+
+const validateOrderItemFields: CollectionBeforeValidateHook = ({ data }) => {
+  if (!data) return data;
+  validateNumber(data.quantity, "La cantidad", 1);
+  validateNumber(data.unitPrice, "El precio unitario", 0);
+  validateNumber(data.total, "El total", 0);
+  return data;
+};
 
 export const OrderItems: CollectionConfig = {
   slug: "order-items",
@@ -17,6 +26,9 @@ export const OrderItems: CollectionConfig = {
     create: isAdmin,
     update: isAdmin,
     delete: isAdmin,
+  },
+  hooks: {
+    beforeValidate: [validateOrderItemFields],
   },
   fields: [
     // -------------------------------------------------------------------------

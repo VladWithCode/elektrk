@@ -171,8 +171,85 @@ export default buildConfig({
           };
         }
 
-        // Detectar errores de upload (tamaño, tipo, procesamiento, UploadThing)
+        // Detectar errores de validación de campos (AJV / schema)
         const errorMsg = error?.message?.toLowerCase() ?? "";
+        if (errorMsg.includes("must have required property") || errorMsg.includes("is required")) {
+          return {
+            response: {
+              errors: [
+                {
+                  message:
+                    "Faltan campos obligatorios. Verifica que todos los campos requeridos estén completos.",
+                },
+              ],
+            },
+            status: 400,
+          };
+        }
+        if (
+          errorMsg.includes("must be greater than or equal to") ||
+          errorMsg.includes("must be less than or equal to") ||
+          errorMsg.includes("validation:lessThanMin") ||
+          errorMsg.includes("validation:greaterThanMax")
+        ) {
+          return {
+            response: {
+              errors: [
+                {
+                  message:
+                    "Algunos valores numéricos están fuera de rango. Verifica los límites mínimos y máximos.",
+                },
+              ],
+            },
+            status: 400,
+          };
+        }
+        if (
+          errorMsg.includes("must be shorter than") ||
+          errorMsg.includes("must be longer than") ||
+          errorMsg.includes("validation:shorterThanMax") ||
+          errorMsg.includes("validation:longerThanMin")
+        ) {
+          return {
+            response: {
+              errors: [
+                {
+                  message:
+                    "Algunos campos de texto exceden la longitud permitida o son demasiado cortos.",
+                },
+              ],
+            },
+            status: 400,
+          };
+        }
+        if (errorMsg.includes("must be number") || errorMsg.includes("validation:enterNumber")) {
+          return {
+            response: {
+              errors: [
+                {
+                  message:
+                    "Algunos campos deben ser números. Verifica que no hayas ingresado texto en campos numéricos.",
+                },
+              ],
+            },
+            status: 400,
+          };
+        }
+        if (errorMsg.includes("email") && errorMsg.includes("invalid")) {
+          return {
+            response: {
+              errors: [
+                {
+                  message:
+                    "El email ingresado no es válido. Verifica el formato.",
+                },
+              ],
+            },
+            status: 400,
+          };
+        }
+
+        // Detectar errores de upload (tamaño, tipo, procesamiento, UploadThing)
         if (
           errorMsg.includes("file size limit has been reached") ||
           errorMsg.includes("request entity too large") ||

@@ -1,6 +1,15 @@
-import type { CollectionConfig } from "payload";
+import type { CollectionConfig, CollectionBeforeValidateHook } from "payload";
 import { isAdmin } from "../lib/payload-access";
 import { guardOrderDelete } from "../lib/payload-delete-guards";
+import { validateNumber } from "../lib/payload-validation-guards";
+
+const validateOrderFields: CollectionBeforeValidateHook = ({ data }) => {
+  if (!data) return data;
+  validateNumber(data.pricing?.subtotal, "El subtotal", 0);
+  validateNumber(data.pricing?.shipping, "El costo de envío", 0);
+  validateNumber(data.pricing?.total, "El total", 0);
+  return data;
+};
 
 export const Orders: CollectionConfig = {
   slug: "orders",
@@ -22,6 +31,7 @@ export const Orders: CollectionConfig = {
   },
   timestamps: true,
   hooks: {
+    beforeValidate: [validateOrderFields],
     beforeDelete: [
       async ({ id, req }) => {
         await guardOrderDelete(req, id);

@@ -1,7 +1,20 @@
-import { type CollectionConfig, type CollectionAfterChangeHook, type CollectionBeforeChangeHook, APIError } from "payload";
+import { type CollectionConfig, type CollectionAfterChangeHook, type CollectionBeforeChangeHook, type CollectionBeforeValidateHook, APIError } from "payload";
 import { isAdmin } from "../lib/payload-access";
 import { guardProductDelete } from "../lib/payload-delete-guards";
 import { guardUniqueSlug } from "../lib/payload-unique-guards";
+import { validateNumber } from "../lib/payload-validation-guards";
+
+// ---------------------------------------------------------------------------
+// beforeValidate hook — clearer validation messages
+// ---------------------------------------------------------------------------
+
+const validateProductFields: CollectionBeforeValidateHook = ({ data }) => {
+  if (!data) return data;
+  validateNumber(data.amperage, "El amperaje", 0);
+  validateNumber(data.voltage, "El voltaje", 0);
+  validateNumber(data.stock, "El stock", 0);
+  return data;
+};
 
 // ---------------------------------------------------------------------------
 // Slug generation helper
@@ -151,6 +164,7 @@ export const Products: CollectionConfig = {
   timestamps: true,
   trash: true,
   hooks: {
+    beforeValidate: [validateProductFields],
     beforeChange: [
       ({ data }) => {
         if (!data.slug && typeof data.name === "string" && data.name.trim()) {

@@ -1,7 +1,8 @@
-import type { CollectionConfig, CollectionBeforeChangeHook } from "payload";
+import type { CollectionConfig, CollectionBeforeChangeHook, CollectionBeforeValidateHook } from "payload";
 import { isAdmin } from "../lib/payload-access";
 import { guardVariantDelete } from "../lib/payload-delete-guards";
 import { guardUniqueSku } from "../lib/payload-unique-guards";
+import { validateNumber } from "../lib/payload-validation-guards";
 
 const syncDeletedFields: CollectionBeforeChangeHook = ({ data }) => {
   if (data.deletedAt && !data.isDeleted) {
@@ -10,6 +11,14 @@ const syncDeletedFields: CollectionBeforeChangeHook = ({ data }) => {
   if (!data.deletedAt && data.isDeleted) {
     data.isDeleted = false;
   }
+  return data;
+};
+
+const validateVariantFields: CollectionBeforeValidateHook = ({ data }) => {
+  if (!data) return data;
+  validateNumber(data.unitsPerPackage, "Las unidades por empaque", 1);
+  validateNumber(data.price, "El precio", 0);
+  validateNumber(data.stock, "El stock", 0);
   return data;
 };
 
@@ -33,6 +42,7 @@ export const Variants: CollectionConfig = {
   },
   trash: true,
   hooks: {
+    beforeValidate: [validateVariantFields],
     beforeChange: [
       syncDeletedFields,
       async ({ data, originalDoc, operation, req }) => {
