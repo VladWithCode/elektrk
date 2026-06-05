@@ -6,6 +6,25 @@ export const Media: CollectionConfig = {
   labels: { singular: "Archivo", plural: "Archivos" },
   upload: {
     staticDir: "public/media",
+    // Payload Admin (list, detail preview, and the upload/relationship field
+    // preview inside Products) renders thumbnails from this. By default it uses
+    // `media.url` / `sizes.thumbnail.url`, which point at Payload's proxy route
+    // (/api/media/file/...). That 404s whenever the original `_key` is null and
+    // breaks in production when serverURL is wrong. Render the DIRECT public
+    // UploadThing URL (https://utfs.io/f/<key>) instead — same approach as the
+    // storefront mapper. Prefer the thumbnail size key (small, fast), then the
+    // card key, then the original; fall back to doc.url for media with no key.
+    adminThumbnail: ({ doc }) => {
+      const sizes = doc?.sizes as
+        | Record<string, { _key?: string | null } | null>
+        | undefined;
+      const key =
+        sizes?.thumbnail?._key ||
+        sizes?.card?._key ||
+        (doc?._key as string | null | undefined);
+      if (key) return `https://utfs.io/f/${key}`;
+      return (doc?.url as string | undefined) ?? null;
+    },
     mimeTypes: [
       "image/jpeg",
       "image/png",

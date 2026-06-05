@@ -97,7 +97,13 @@ export default buildConfig({
       collections: {
         media: true,
       },
-      clientUploads: true,
+      // Server-side uploads. With clientUploads:true the browser uploaded the
+      // original file straight to UploadThing but its returned key was never
+      // persisted to media._key → the original 404'd everywhere (local + prod)
+      // and product images never rendered. Server-side upload populates _key
+      // (and every image-size key) reliably on Node (production) and on the
+      // Next dev-server runtime.
+      clientUploads: false,
       options: {
         token: process.env.UPLOADTHING_TOKEN,
         acl: "public-read",
