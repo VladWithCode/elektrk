@@ -15,6 +15,12 @@ import type { Product, ProductVariant, Poles, TripCurve, VariantType } from "@/t
 // Raw Payload shapes (populated at depth >= 1)
 // ---------------------------------------------------------------------------
 
+/** UploadThing storage key for one generated image size. */
+interface PayloadMediaSize {
+  _key?: string | null;
+  filename?: string | null;
+}
+
 export interface PayloadMediaRef {
   id: string;
   url: string;
@@ -22,6 +28,10 @@ export interface PayloadMediaRef {
   /** MIME type returned by Payload (e.g. "application/pdf", "image/jpeg") */
   mimeType?: string;
   alt?: string;
+  /** UploadThing key for the original file (storage-uploadthing plugin). */
+  _key?: string | null;
+  /** UploadThing keys for generated image sizes. */
+  sizes?: Record<string, PayloadMediaSize | null> | null;
 }
 
 export interface PayloadVariant {
@@ -143,33 +153,65 @@ export function mapPayloadProduct(p: PayloadProduct): Product {
 // Helpers
 // ---------------------------------------------------------------------------
 
+/** UploadThing public file host. Files uploaded with acl "public-read" are
+ *  served here directly, with no token and no signed URL. */
+const UPLOADTHING_PUBLIC_BASE = "https://utfs.io/f/";
+
+/**
+ * Builds a public UploadThing URL from a stored storage key.
+ * The storage-uploadthing plugin saves the key in `_key` (original) and in
+ * `sizes.<name>._key` (generated sizes).
+ */
+function uploadthingUrlFromKey(key: string | null | undefined): string | null {
+  if (!key) return null;
+  return UPLOADTHING_PUBLIC_BASE + key;
+}
+
+/** Picks the best available UploadThing key: original first, then any size. */
+function pickUploadthingKey(ref: PayloadMediaRef): string | null {
+  if (ref._key) return ref._key;
+  const sizes = ref.sizes;
+  if (sizes) {
+    // Prefer larger sizes (card) over thumbnail when the original is missing.
+    for (const name of ["card", "thumbnail"]) {
+      const k = sizes[name]?._key;
+      if (k) return k;
+    }
+    for (const s of Object.values(sizes)) {
+      if (s?._key) return s._key;
+    }
+  }
+  return null;
+}
+
 /**
  * Normalises a media URL for use as a `next/image` src.
  *
- * Payload serialises Media.url as an ABSOLUTE URL built from `serverURL`
- * (e.g. "http://localhost:3000/api/media/file/foo.png"). Next.js 16's image
- * optimizer rejects absolute upstreams that resolve to a private/loopback IP
- * (SSRF guard) → the request 400s and the image never renders.
+ * Storage with @payloadcms/storage-uploadthing keeps `Media.url` pointing at
+ * Payload's own proxy route ("/api/media/file/<filename>", absolutised with
+ * `serverURL`). Two problems with using that as a next/image src:
+ *   1. Local dev: the absolute serverURL is "http://localhost:3000" → Next's
+ *      optimizer rejects the private/loopback upstream (SSRF guard) → 400.
+ *   2. Vercel prod: the optimizer rejects the dynamic API-route upstream with
+ *      "INVALID_IMAGE_OPTIMIZE_REQUEST" → 400 → image never renders.
  *
- * Fix: when the URL points at this app's own media route, strip the origin and
- * return a same-origin RELATIVE path. The optimizer then fetches it locally
- * (no private-IP block) and it stays correct across every deploy host.
- * Genuinely remote CDN URLs (e.g. UploadThing's utfs.io / *.ufs.sh) are left
- * absolute so `images.remotePatterns` handles them.
+ * Fix: when the media has an UploadThing storage key, render the DIRECT public
+ * UploadThing URL (https://utfs.io/f/<key>). It is a real CDN URL accepted by
+ * the optimizer on both local and Vercel, needs no token (public-read ACL),
+ * and is identical in every environment. Falls back to a same-origin relative
+ * path for any media without a key.
  */
 function toClientMediaUrl(url: string): string {
   if (!url) return url;
-  // Already relative — nothing to do.
-  if (url.startsWith("/")) return url;
+  if (url.startsWith("/")) return url; // already relative
   try {
     const parsed = new URL(url);
-    // Payload's own file-serving routes are same-origin with the Next app.
     if (parsed.pathname.startsWith("/api/media/") || parsed.pathname.startsWith("/media/")) {
-      return parsed.pathname + parsed.search;
+      return parsed.pathname + parsed.search; // same-origin proxy fallback
     }
-    return url; // remote CDN (UploadThing, S3, …) — keep absolute
+    return url; // remote CDN — keep absolute
   } catch {
-    return url; // not a parseable absolute URL — return as-is
+    return url;
   }
 }
 
@@ -180,6 +222,9 @@ function toClientMediaUrl(url: string): string {
 function resolveMediaUrl(ref: PayloadMediaRef | string | null | undefined): string | null {
   if (!ref) return null;
   if (typeof ref === "string") return null; // bare ID — caller used depth=0
+  // Prefer the direct public UploadThing URL (works on local + Vercel).
+  const utUrl = uploadthingUrlFromKey(pickUploadthingKey(ref));
+  if (utUrl) return utUrl;
   return ref.url ? toClientMediaUrl(ref.url) : null;
 }
 
@@ -199,9 +244,12 @@ function resolveMediaDoc(
 ): ResolvedMediaDoc | null {
   if (!ref) return null;
   if (typeof ref === "string") return null; // bare ID — not populated
-  if (!ref.url) return null;
+  // Prefer the direct public UploadThing URL when available.
+  const utUrl = uploadthingUrlFromKey(ref._key);
+  const url = utUrl ?? (ref.url ? toClientMediaUrl(ref.url) : null);
+  if (!url) return null;
   return {
-    url: toClientMediaUrl(ref.url),
+    url,
     filename: ref.filename ?? null,
     mimeType: ref.mimeType ?? null,
   };
