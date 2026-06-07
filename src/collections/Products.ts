@@ -125,9 +125,9 @@ export const Products: CollectionConfig = {
   labels: { singular: "Producto", plural: "Productos" },
   admin: {
     useAsTitle: "name",
-    defaultColumns: ["name", "brand", "amperage", "poles", "tripCurve", "isActive", "featured"],
+    defaultColumns: ["name", "brand", "category", "isActive", "featured"],
     group: "Catálogo",
-    description: "Catálogo de interruptores termomagnéticos y componentes eléctricos.",
+    description: "Catálogo multi-categoría: interruptores, gabinetes, unicanal, fijación, soportería y herramientas.",
   },
   access: {
     read: ({ req }) => {
@@ -205,11 +205,32 @@ export const Products: CollectionConfig = {
             },
             {
               name: "category",
-              type: "text",
+              type: "select",
               label: "Categoría",
               required: true,
+              defaultValue: "interruptores",
+              options: [
+                { label: "Interruptores termomagnéticos", value: "interruptores" },
+                { label: "Gabinetes y tableros", value: "gabinetes_tableros" },
+                { label: "Unicanal galvanizado", value: "unicanal" },
+                { label: "Sistemas de fijación", value: "fijacion" },
+                { label: "Soportería", value: "soporteria" },
+                { label: "Herramientas y accesorios", value: "herramientas_accesorios" },
+              ],
               admin: {
-                description: "Ej. Interruptores Termomagnéticos, Protecciones Industriales.",
+                description:
+                  "Define qué campos técnicos se muestran abajo. Los specs específicos por SKU " +
+                  "(precio, stock, medida exacta) van en cada Variante.",
+              },
+            },
+            {
+              name: "productLine",
+              type: "text",
+              label: "Línea / Serie",
+              admin: {
+                description:
+                  "Línea o serie del fabricante. Ej. I-LINE, Caja Moldeada, Power Pact, " +
+                  "ED63B, FXD63B, NF, NQ. Opcional.",
               },
             },
             {
@@ -263,58 +284,379 @@ export const Products: CollectionConfig = {
         {
           label: "Especificaciones",
           fields: [
+            // -----------------------------------------------------------------
+            // Común a todas las categorías
+            // -----------------------------------------------------------------
+            {
+              name: "stock",
+              type: "number",
+              label: "Stock total disponible",
+              min: 0,
+              defaultValue: 0,
+              admin: {
+                description: "Suma de todas las variantes. Actualizar manualmente o via webhook de inventario.",
+              },
+            },
+
+            // =================================================================
+            // A. Interruptores termomagnéticos
+            // =================================================================
             {
               name: "amperage",
               type: "number",
               label: "Amperaje (A)",
-              required: true,
               min: 0,
               admin: {
                 description: "Corriente nominal en Amperes. Ej. 10, 16, 25, 63.",
+                condition: (data) => data.category === "interruptores",
               },
             },
             {
               name: "poles",
               type: "select",
               label: "Número de polos",
-              required: true,
               options: [
                 { label: "1 polo  — monofásico", value: "1" },
                 { label: "2 polos — bifásico", value: "2" },
                 { label: "3 polos — trifásico", value: "3" },
                 { label: "4 polos — trifásico + neutro", value: "4" },
               ],
+              admin: {
+                condition: (data) => data.category === "interruptores",
+              },
             },
             {
               name: "voltage",
               type: "number",
               label: "Voltaje (V)",
-              required: true,
               min: 0,
               admin: {
                 description: "Tensión nominal de operación. Ej. 120, 240, 380, 480.",
+                condition: (data) => data.category === "interruptores",
               },
             },
             {
               name: "tripCurve",
               type: "select",
               label: "Curva de disparo",
-              required: true,
               options: [
                 { label: "Curva B — protección de líneas (3–5× In)", value: "B" },
                 { label: "Curva C — uso general (5–10× In)", value: "C" },
                 { label: "Curva D — motores y transformadores (10–20× In)", value: "D" },
               ],
+              admin: {
+                condition: (data) => data.category === "interruptores",
+              },
             },
             {
-              name: "stock",
+              name: "interruptingCapacity",
               type: "number",
-              label: "Stock total disponible",
-              required: true,
+              label: "Capacidad interruptiva (kA)",
               min: 0,
-              defaultValue: 0,
               admin: {
-                description: "Suma de todas las variantes. Actualizar manualmente o via webhook de inventario.",
+                description: "Capacidad de ruptura en kA. Ej. 10, 25, 65.",
+                condition: (data) => data.category === "interruptores",
+              },
+            },
+            {
+              name: "mountingType",
+              type: "select",
+              label: "Tipo de montaje",
+              options: [
+                { label: "Barra I-LINE (plug-in)", value: "iline" },
+                { label: "Tornillo / gabinete", value: "screw" },
+              ],
+              admin: {
+                condition: (data) => data.category === "interruptores",
+              },
+            },
+            {
+              name: "breakerType",
+              type: "text",
+              label: "Tipo de interruptor",
+              admin: {
+                description: "Ej. Caja moldeada, Power Pact, Master Pact.",
+                condition: (data) => data.category === "interruptores",
+              },
+            },
+            {
+              name: "frame",
+              type: "text",
+              label: "Frame / Marco",
+              admin: {
+                description: "Designación de frame del fabricante. Ej. FA, KA, LA, MA.",
+                condition: (data) => data.category === "interruptores",
+              },
+            },
+
+            // =================================================================
+            // B. Gabinetes y tableros
+            // =================================================================
+            {
+              name: "boardType",
+              type: "select",
+              label: "Tipo de tablero / gabinete",
+              options: [
+                { label: "Tablero NF (industrial)", value: "nf" },
+                { label: "Tablero NQ (comercial)", value: "nq" },
+                { label: "Tablero I-LINE", value: "iline" },
+                { label: "Autosoportado", value: "autosoportado" },
+                { label: "Gabinete (centro de carga)", value: "gabinete" },
+              ],
+              admin: {
+                condition: (data) => data.category === "gabinetes_tableros",
+              },
+            },
+            {
+              name: "nemaRating",
+              type: "select",
+              label: "Clasificación NEMA",
+              options: [
+                { label: "NEMA 1 — interior", value: "1" },
+                { label: "NEMA 3R — intemperie", value: "3r" },
+              ],
+              admin: {
+                condition: (data) => data.category === "gabinetes_tableros",
+              },
+            },
+            {
+              name: "amperageCapacity",
+              type: "number",
+              label: "Capacidad (A)",
+              min: 0,
+              admin: {
+                description: "Capacidad de corriente del tablero/gabinete. Ej. 100, 400, 1200, 5000.",
+                condition: (data) => data.category === "gabinetes_tableros",
+              },
+            },
+            {
+              name: "enclosureUse",
+              type: "select",
+              label: "Uso del gabinete",
+              options: [
+                { label: "Interior", value: "interior" },
+                { label: "Intemperie", value: "intemperie" },
+              ],
+              admin: {
+                condition: (data) => data.category === "gabinetes_tableros",
+              },
+            },
+            {
+              name: "spaces",
+              type: "number",
+              label: "Espacios",
+              min: 0,
+              admin: {
+                condition: (data) => data.category === "gabinetes_tableros",
+              },
+            },
+            {
+              name: "circuits",
+              type: "number",
+              label: "Circuitos",
+              min: 0,
+              admin: {
+                condition: (data) => data.category === "gabinetes_tableros",
+              },
+            },
+            {
+              name: "compatibleBreakerLine",
+              type: "text",
+              label: "Línea de interruptor compatible",
+              admin: {
+                description: "Ej. I-LINE, Caja Moldeada.",
+                condition: (data) => data.category === "gabinetes_tableros",
+              },
+            },
+
+            // =================================================================
+            // C. Unicanal galvanizado
+            // =================================================================
+            {
+              name: "channelType",
+              type: "select",
+              label: "Tipo de unicanal",
+              options: [
+                { label: "Sólido (sin perforación)", value: "solido" },
+                { label: "Perforado", value: "perforado" },
+              ],
+              admin: {
+                condition: (data) => data.category === "unicanal",
+              },
+            },
+            {
+              name: "gauge",
+              type: "select",
+              label: "Calibre",
+              options: [
+                { label: "Calibre 14", value: "14" },
+                { label: "Calibre 16", value: "16" },
+                { label: "Calibre 18", value: "18" },
+              ],
+              admin: {
+                condition: (data) => data.category === "unicanal",
+              },
+            },
+            {
+              name: "dimensions",
+              type: "text",
+              label: "Medida",
+              admin: {
+                description: 'Ej. 4 × 2", 4 × 4".',
+                condition: (data) => data.category === "unicanal",
+              },
+            },
+            {
+              name: "length",
+              type: "text",
+              label: "Largo",
+              admin: {
+                description: "Ej. 3.05 m (largo estándar).",
+                condition: (data) => data.category === "unicanal",
+              },
+            },
+            {
+              name: "finish",
+              type: "text",
+              label: "Acabado",
+              admin: {
+                description: "Ej. Galvanizado.",
+                condition: (data) =>
+                  data.category === "unicanal" || data.category === "soporteria",
+              },
+            },
+            {
+              name: "customLengthAvailable",
+              type: "checkbox",
+              label: "Largo a la medida disponible",
+              defaultValue: false,
+              admin: {
+                condition: (data) => data.category === "unicanal",
+              },
+            },
+
+            // =================================================================
+            // D. Sistemas de fijación
+            // =================================================================
+            {
+              name: "anchorType",
+              type: "text",
+              label: "Tipo de anclaje",
+              admin: {
+                description: "Ej. Expanzor Z, Expanzor TX, ADI, Ancla-Arpón, Cuña.",
+                condition: (data) => data.category === "fijacion",
+              },
+            },
+            {
+              name: "boxQuantity",
+              type: "number",
+              label: "Piezas por caja",
+              min: 0,
+              admin: {
+                description: "Cantidad de piezas en presentación de caja/mayoreo.",
+                condition: (data) => data.category === "fijacion",
+              },
+            },
+
+            // =================================================================
+            // E. Soportería
+            // =================================================================
+            {
+              name: "supportType",
+              type: "text",
+              label: "Tipo de soporte",
+              admin: {
+                description: "Ej. Varilla roscada, Tuerca resorte, Mordaza, Trapecio, Cinta perforada.",
+                condition: (data) => data.category === "soporteria",
+              },
+            },
+            {
+              name: "compatibleWithUnicanal",
+              type: "checkbox",
+              label: "Compatible con unicanal",
+              defaultValue: false,
+              admin: {
+                condition: (data) => data.category === "soporteria",
+              },
+            },
+
+            // =================================================================
+            // F. Herramientas y accesorios
+            // =================================================================
+            {
+              name: "accessoryType",
+              type: "text",
+              label: "Tipo de accesorio / herramienta",
+              admin: {
+                description: "Ej. Clavos, Cartuchos, Pernos, Brocas SDS.",
+                condition: (data) => data.category === "herramientas_accesorios",
+              },
+            },
+            {
+              name: "compatibleTool",
+              type: "text",
+              label: "Herramienta compatible",
+              admin: {
+                description: "Ej. Pistola de fijación, Rotomartillo.",
+                condition: (data) => data.category === "herramientas_accesorios",
+              },
+            },
+            {
+              name: "application",
+              type: "text",
+              label: "Aplicación",
+              admin: {
+                description: "Ej. Concreto, Fierro estructural, Alta velocidad.",
+                condition: (data) =>
+                  data.category === "fijacion" ||
+                  data.category === "herramientas_accesorios",
+              },
+            },
+            {
+              name: "presentation",
+              type: "text",
+              label: "Presentación",
+              admin: {
+                description: "Ej. Por pieza, Caja, Ciento, Rollo.",
+                condition: (data) => data.category === "herramientas_accesorios",
+              },
+            },
+
+            // -----------------------------------------------------------------
+            // Compartidos: medidas físicas (fijación / soportería / herramientas)
+            // -----------------------------------------------------------------
+            {
+              name: "material",
+              type: "text",
+              label: "Material",
+              admin: {
+                description: "Ej. Acero, Latón, Acero galvanizado.",
+                condition: (data) =>
+                  data.category === "fijacion" || data.category === "soporteria",
+              },
+            },
+            {
+              name: "dimDiameter",
+              type: "text",
+              label: "Diámetro",
+              admin: {
+                description: 'Medida nominal. Ej. 3/16", 1/4", 3/4".',
+                condition: (data) =>
+                  data.category === "fijacion" ||
+                  data.category === "soporteria" ||
+                  data.category === "herramientas_accesorios",
+              },
+            },
+            {
+              name: "dimLength",
+              type: "text",
+              label: "Largo",
+              admin: {
+                description: 'Ej. 1 m, 3 m, 2.1/2".',
+                condition: (data) =>
+                  data.category === "fijacion" ||
+                  data.category === "soporteria" ||
+                  data.category === "herramientas_accesorios",
               },
             },
           ],

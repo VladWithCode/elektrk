@@ -11,6 +11,7 @@ import { StockBadge } from "@/components/shared/StockBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { getProductPills } from "@/lib/product-specs";
 
 /** Returns true when the URL is a real image (not the placeholder fallback). */
 function isRealImage(url: string | undefined): url is string {
@@ -77,7 +78,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
                 <Zap className="h-8 w-8 text-primary/60" />
               </div>
               <div className="flex gap-1">
-                {Array.from({ length: product.poles }).map((_, i) => (
+                {Array.from({ length: product.poles ?? 0 }).map((_, i) => (
                   <div key={i} className="w-3 h-3 rounded-sm bg-primary/30" />
                 ))}
               </div>
@@ -98,20 +99,16 @@ export function ProductCard({ product, className }: ProductCardProps) {
             {product.name}
           </h3>
 
-          {/* Specs pills */}
+          {/* Specs pills — category-aware, never renders undefined */}
           <div className="flex flex-wrap gap-1 mt-auto pt-1">
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-mono">
-              {product.amperage}A
-            </span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-mono">
-              {product.poles}P
-            </span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-mono">
-              {product.voltage}V
-            </span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-mono">
-              Curva {product.tripCurve}
-            </span>
+            {getProductPills(product).map((pill, i) => (
+              <span
+                key={i}
+                className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-mono"
+              >
+                {pill}
+              </span>
+            ))}
           </div>
         </div>
       </Link>

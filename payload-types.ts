@@ -187,6 +187,8 @@ export interface Media {
    * Usado por el filtro de relaciones en Productos para mostrar solo el tipo correcto en cada campo (imágenes → image, ficha técnica → datasheet, meta → og-image).
    */
   documentType: 'image' | 'datasheet' | 'og-image' | 'document';
+  _key?: string | null;
+  prefix?: string | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -200,6 +202,7 @@ export interface Media {
   focalY?: number | null;
   sizes?: {
     thumbnail?: {
+      _key?: string | null;
       url?: string | null;
       width?: number | null;
       height?: number | null;
@@ -208,6 +211,7 @@ export interface Media {
       filename?: string | null;
     };
     card?: {
+      _key?: string | null;
       url?: string | null;
       width?: number | null;
       height?: number | null;
@@ -218,7 +222,7 @@ export interface Media {
   };
 }
 /**
- * Catálogo de interruptores termomagnéticos y componentes eléctricos.
+ * Catálogo multi-categoría: interruptores, gabinetes, unicanal, fijación, soportería y herramientas.
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "products".
@@ -242,9 +246,13 @@ export interface Product {
    */
   model: string;
   /**
-   * Ej. Interruptores Termomagnéticos, Protecciones Industriales.
+   * Define qué campos técnicos se muestran abajo. Los specs específicos por SKU (precio, stock, medida exacta) van en cada Variante.
    */
-  category: string;
+  category: 'interruptores' | 'gabinetes_tableros' | 'unicanal' | 'fijacion' | 'soporteria' | 'herramientas_accesorios';
+  /**
+   * Línea o serie del fabricante. Ej. I-LINE, Caja Moldeada, Power Pact, ED63B, FXD63B, NF, NQ. Opcional.
+   */
+  productLine?: string | null;
   /**
    * Máx. 120 caracteres. Aparece en tarjetas del catálogo.
    */
@@ -267,19 +275,101 @@ export interface Product {
       }[]
     | null;
   /**
+   * Suma de todas las variantes. Actualizar manualmente o via webhook de inventario.
+   */
+  stock?: number | null;
+  /**
    * Corriente nominal en Amperes. Ej. 10, 16, 25, 63.
    */
-  amperage: number;
-  poles: '1' | '2' | '3' | '4';
+  amperage?: number | null;
+  poles?: ('1' | '2' | '3' | '4') | null;
   /**
    * Tensión nominal de operación. Ej. 120, 240, 380, 480.
    */
-  voltage: number;
-  tripCurve: 'B' | 'C' | 'D';
+  voltage?: number | null;
+  tripCurve?: ('B' | 'C' | 'D') | null;
   /**
-   * Suma de todas las variantes. Actualizar manualmente o via webhook de inventario.
+   * Capacidad de ruptura en kA. Ej. 10, 25, 65.
    */
-  stock: number;
+  interruptingCapacity?: number | null;
+  mountingType?: ('iline' | 'screw') | null;
+  /**
+   * Ej. Caja moldeada, Power Pact, Master Pact.
+   */
+  breakerType?: string | null;
+  /**
+   * Designación de frame del fabricante. Ej. FA, KA, LA, MA.
+   */
+  frame?: string | null;
+  boardType?: ('nf' | 'nq' | 'iline' | 'autosoportado' | 'gabinete') | null;
+  nemaRating?: ('1' | '3r') | null;
+  /**
+   * Capacidad de corriente del tablero/gabinete. Ej. 100, 400, 1200, 5000.
+   */
+  amperageCapacity?: number | null;
+  enclosureUse?: ('interior' | 'intemperie') | null;
+  spaces?: number | null;
+  circuits?: number | null;
+  /**
+   * Ej. I-LINE, Caja Moldeada.
+   */
+  compatibleBreakerLine?: string | null;
+  channelType?: ('solido' | 'perforado') | null;
+  gauge?: ('14' | '16' | '18') | null;
+  /**
+   * Ej. 4 × 2", 4 × 4".
+   */
+  dimensions?: string | null;
+  /**
+   * Ej. 3.05 m (largo estándar).
+   */
+  length?: string | null;
+  /**
+   * Ej. Galvanizado.
+   */
+  finish?: string | null;
+  customLengthAvailable?: boolean | null;
+  /**
+   * Ej. Expanzor Z, Expanzor TX, ADI, Ancla-Arpón, Cuña.
+   */
+  anchorType?: string | null;
+  /**
+   * Cantidad de piezas en presentación de caja/mayoreo.
+   */
+  boxQuantity?: number | null;
+  /**
+   * Ej. Varilla roscada, Tuerca resorte, Mordaza, Trapecio, Cinta perforada.
+   */
+  supportType?: string | null;
+  compatibleWithUnicanal?: boolean | null;
+  /**
+   * Ej. Clavos, Cartuchos, Pernos, Brocas SDS.
+   */
+  accessoryType?: string | null;
+  /**
+   * Ej. Pistola de fijación, Rotomartillo.
+   */
+  compatibleTool?: string | null;
+  /**
+   * Ej. Concreto, Fierro estructural, Alta velocidad.
+   */
+  application?: string | null;
+  /**
+   * Ej. Por pieza, Caja, Ciento, Rollo.
+   */
+  presentation?: string | null;
+  /**
+   * Ej. Acero, Latón, Acero galvanizado.
+   */
+  material?: string | null;
+  /**
+   * Medida nominal. Ej. 3/16", 1/4", 3/4".
+   */
+  dimDiameter?: string | null;
+  /**
+   * Ej. 1 m, 3 m, 2.1/2".
+   */
+  dimLength?: string | null;
   /**
    * Subir en Media (documentType: Imagen de producto) antes de seleccionar aquí.
    */
@@ -382,6 +472,18 @@ export interface Variant {
    * Unidades disponibles de esta presentación específica.
    */
   stock: number;
+  /**
+   * Valor exacto de este SKU que la diferencia de otras variantes. Ej. "63 A", "Calibre 14 · 4×2\" · 3.05 m", "3/4\" × 12\"".
+   */
+  variantSpec?: string | null;
+  /**
+   * Forma de venta. Ej. "Pieza", "Caja de 100", "Rollo 25 m".
+   */
+  presentation?: string | null;
+  /**
+   * Unidad mostrada al cliente. Ej. "pza", "caja", "rollo", "m".
+   */
+  unitLabel?: string | null;
   /**
    * Desactivar para ocultar esta presentación sin eliminarla. Las variantes inactivas no aparecen en el storefront.
    */
@@ -702,6 +804,8 @@ export interface MediaSelect<T extends boolean = true> {
   alt?: T;
   caption?: T;
   documentType?: T;
+  _key?: T;
+  prefix?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;
@@ -719,6 +823,7 @@ export interface MediaSelect<T extends boolean = true> {
         thumbnail?:
           | T
           | {
+              _key?: T;
               url?: T;
               width?: T;
               height?: T;
@@ -729,6 +834,7 @@ export interface MediaSelect<T extends boolean = true> {
         card?:
           | T
           | {
+              _key?: T;
               url?: T;
               width?: T;
               height?: T;
@@ -748,6 +854,7 @@ export interface ProductsSelect<T extends boolean = true> {
   brand?: T;
   model?: T;
   category?: T;
+  productLine?: T;
   shortDescription?: T;
   description?: T;
   technicalSummary?: T;
@@ -757,11 +864,39 @@ export interface ProductsSelect<T extends boolean = true> {
         tag?: T;
         id?: T;
       };
+  stock?: T;
   amperage?: T;
   poles?: T;
   voltage?: T;
   tripCurve?: T;
-  stock?: T;
+  interruptingCapacity?: T;
+  mountingType?: T;
+  breakerType?: T;
+  frame?: T;
+  boardType?: T;
+  nemaRating?: T;
+  amperageCapacity?: T;
+  enclosureUse?: T;
+  spaces?: T;
+  circuits?: T;
+  compatibleBreakerLine?: T;
+  channelType?: T;
+  gauge?: T;
+  dimensions?: T;
+  length?: T;
+  finish?: T;
+  customLengthAvailable?: T;
+  anchorType?: T;
+  boxQuantity?: T;
+  supportType?: T;
+  compatibleWithUnicanal?: T;
+  accessoryType?: T;
+  compatibleTool?: T;
+  application?: T;
+  presentation?: T;
+  material?: T;
+  dimDiameter?: T;
+  dimLength?: T;
   images?:
     | T
     | {
@@ -797,6 +932,9 @@ export interface VariantsSelect<T extends boolean = true> {
   unitsPerPackage?: T;
   price?: T;
   stock?: T;
+  variantSpec?: T;
+  presentation?: T;
+  unitLabel?: T;
   isActive?: T;
   isDeleted?: T;
   deletedAt?: T;

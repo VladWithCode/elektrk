@@ -14,9 +14,9 @@
  * never touches the database.
  */
 
-import type { Product, FilterState, Poles, TripCurve } from "@/types/product";
-import { MOCK_PRODUCTS, MOCK_FILTERS } from "@/data/mock-products";
-import { applyFilters } from "@/lib/filters";
+import type { Product, FilterState, Poles, TripCurve, ProductCategory } from "@/types/product";
+import { MOCK_PRODUCTS } from "@/data/mock-products";
+import { applyFilters, EMPTY_FILTER_STATE } from "@/lib/filters";
 import {
   mapPayloadProduct,
   type PayloadProduct,
@@ -27,11 +27,28 @@ import {
 // ---------------------------------------------------------------------------
 
 export interface ProductFilterOptions {
+  categories: ProductCategory[];
   brands: string[];
+  // Interruptores
   amperages: number[];
   poles: readonly Poles[];
   voltages: number[];
   tripCurves: readonly TripCurve[];
+  // Unicanal
+  gauges: string[];
+  dimensions: string[];
+  channelTypes: string[];
+  finishes: string[];
+  // Gabinetes y tableros
+  boardTypes: string[];
+  nemaRatings: string[];
+  amperageCapacities: number[];
+  // Fijación / Soportería / Herramientas
+  anchorTypes: string[];
+  supportTypes: string[];
+  accessoryTypes: string[];
+  dimDiameters: string[];
+  dimLengths: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -122,32 +139,14 @@ export async function getProducts(filters?: Partial<FilterState>): Promise<Produ
     });
     const products = (result.docs as PayloadProduct[]).map(mapPayloadProduct);
     if (!filters) return products;
-    const merged: FilterState = {
-      amperage: filters.amperage ?? [],
-      poles: filters.poles ?? [],
-      voltage: filters.voltage ?? [],
-      tripCurve: filters.tripCurve ?? [],
-      brand: filters.brand ?? [],
-      category: filters.category ?? [],
-      search: filters.search ?? "",
-      sortBy: filters.sortBy ?? "name_asc",
-    };
+    const merged: FilterState = { ...EMPTY_FILTER_STATE, ...filters };
     return applyFilters(products, merged);
   }
 
   // --- mock ---
   const base = MOCK_PRODUCTS;
   if (!filters) return base;
-  const merged: FilterState = {
-    amperage: filters.amperage ?? [],
-    poles: filters.poles ?? [],
-    voltage: filters.voltage ?? [],
-    tripCurve: filters.tripCurve ?? [],
-    brand: filters.brand ?? [],
-    category: filters.category ?? [],
-    search: filters.search ?? "",
-    sortBy: filters.sortBy ?? "name_asc",
-  };
+  const merged: FilterState = { ...EMPTY_FILTER_STATE, ...filters };
   return applyFilters(base, merged);
 }
 
@@ -216,45 +215,47 @@ export async function getFeaturedProducts(limit = 4): Promise<Product[]> {
  *   For large catalogs consider caching this result (revalidate: 3600).
  */
 export async function getProductFilters(): Promise<ProductFilterOptions> {
-  if (resolveDataSource() === "payload") {
-    const payload = await getPayloadClient();
-    const result = await payload.find({
-      collection: "products",
-      where: {
-        and: [
-          { isActive: { equals: true } },
-          { isDeleted: { not_equals: true } },
-        ],
-      },
-      depth: 0,
-      limit: 500,
-      select: { brand: true, amperage: true, poles: true, voltage: true, tripCurve: true },
-    });
+  // Derive distinct facet values from the active product set. getProducts()
+  // already resolves the correct data source (payload or mock) and maps to the
+  // storefront Product shape, so facets stay consistent with what is rendered.
+  const products = await getProducts();
+  return deriveFilterOptions(products);
+}
 
-    const docs = result.docs as Array<{
-      brand: string;
-      amperage: number;
-      poles: string;
-      voltage: number;
-      tripCurve: string;
-    }>;
+function uniqStr(values: Array<string | null | undefined>): string[] {
+  return [...new Set(values.filter((v): v is string => !!v))].sort((a, b) =>
+    a.localeCompare(b, "es", { numeric: true })
+  );
+}
 
-    const brands    = [...new Set(docs.map((d) => d.brand))].sort();
-    const amperages = [...new Set(docs.map((d) => d.amperage))].sort((a, b) => a - b);
-    const poles     = [...new Set(docs.map((d) => Number(d.poles)))].sort((a, b) => a - b) as Poles[];
-    const voltages  = [...new Set(docs.map((d) => d.voltage))].sort((a, b) => a - b);
-    const tripCurves = [...new Set(docs.map((d) => d.tripCurve))].sort() as TripCurve[];
+function uniqNum(values: Array<number | null | undefined>): number[] {
+  return [...new Set(values.filter((v): v is number => v != null))].sort((a, b) => a - b);
+}
 
-    return { brands, amperages, poles, voltages, tripCurves };
-  }
-
-  // --- mock ---
+function deriveFilterOptions(products: Product[]): ProductFilterOptions {
   return {
-    brands:     MOCK_FILTERS.brands,
-    amperages:  MOCK_FILTERS.amperages,
-    poles:      MOCK_FILTERS.poles,
-    voltages:   MOCK_FILTERS.voltages,
-    tripCurves: MOCK_FILTERS.tripCurves,
+    categories: [...new Set(products.map((p) => p.category))] as ProductCategory[],
+    brands: uniqStr(products.map((p) => p.brand)),
+    amperages: uniqNum(products.map((p) => p.amperage)),
+    poles: [...new Set(products.map((p) => p.poles).filter((v): v is Poles => v != null))].sort(
+      (a, b) => a - b
+    ),
+    voltages: uniqNum(products.map((p) => p.voltage)),
+    tripCurves: [
+      ...new Set(products.map((p) => p.tripCurve).filter((v): v is TripCurve => v != null)),
+    ].sort() as TripCurve[],
+    gauges: uniqStr(products.map((p) => p.gauge)),
+    dimensions: uniqStr(products.map((p) => p.dimensions)),
+    channelTypes: uniqStr(products.map((p) => p.channelType)),
+    finishes: uniqStr(products.map((p) => p.finish)),
+    boardTypes: uniqStr(products.map((p) => p.boardType)),
+    nemaRatings: uniqStr(products.map((p) => p.nemaRating)),
+    amperageCapacities: uniqNum(products.map((p) => p.amperageCapacity)),
+    anchorTypes: uniqStr(products.map((p) => p.anchorType)),
+    supportTypes: uniqStr(products.map((p) => p.supportType)),
+    accessoryTypes: uniqStr(products.map((p) => p.accessoryType)),
+    dimDiameters: uniqStr(products.map((p) => p.dimDiameter)),
+    dimLengths: uniqStr(products.map((p) => p.dimLength)),
   };
 }
 
@@ -279,16 +280,7 @@ export async function searchProducts(query: string): Promise<Product[]> {
 
   // --- Mock path ---
   if (resolveDataSource() !== "payload") {
-    const merged: FilterState = {
-      amperage: [],
-      poles: [],
-      voltage: [],
-      tripCurve: [],
-      brand: [],
-      category: [],
-      search: q,
-      sortBy: "name_asc",
-    };
+    const merged: FilterState = { ...EMPTY_FILTER_STATE, search: q };
     return applyFilters(MOCK_PRODUCTS, merged);
   }
 

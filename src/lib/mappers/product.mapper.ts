@@ -9,7 +9,7 @@
  *   - price / stock: always number, but guard against undefined for safety
  */
 
-import type { Product, ProductVariant, Poles, TripCurve, VariantType } from "@/types/product";
+import type { Product, ProductVariant, Poles, TripCurve, VariantType, ProductCategory } from "@/types/product";
 
 // ---------------------------------------------------------------------------
 // Raw Payload shapes (populated at depth >= 1)
@@ -42,6 +42,9 @@ export interface PayloadVariant {
   price: number;
   stock: number;
   isActive: boolean;
+  variantSpec?: string | null;
+  presentation?: string | null;
+  unitLabel?: string | null;
 }
 
 /** Payload join fields return { docs: T[], hasNextPage: boolean, ... } */
@@ -62,12 +65,45 @@ export interface PayloadProduct {
   technicalSummary?: string | null;
   brand: string;
   model: string;
-  amperage: number;
+  category: ProductCategory;
+  productLine?: string | null;
+  // Interruptores (optional)
+  amperage?: number | null;
   /** Payload serialises select fields as strings even for numeric options */
-  poles: "1" | "2" | "3" | "4";
-  voltage: number;
-  tripCurve: TripCurve;
-  category: string;
+  poles?: "1" | "2" | "3" | "4" | null;
+  voltage?: number | null;
+  tripCurve?: TripCurve | null;
+  interruptingCapacity?: number | null;
+  mountingType?: string | null;
+  breakerType?: string | null;
+  frame?: string | null;
+  // Gabinetes y tableros
+  boardType?: string | null;
+  nemaRating?: string | null;
+  amperageCapacity?: number | null;
+  enclosureUse?: string | null;
+  spaces?: number | null;
+  circuits?: number | null;
+  compatibleBreakerLine?: string | null;
+  // Unicanal
+  channelType?: string | null;
+  gauge?: string | null;
+  dimensions?: string | null;
+  length?: string | null;
+  finish?: string | null;
+  customLengthAvailable?: boolean | null;
+  // Fijación / Soportería / Herramientas
+  anchorType?: string | null;
+  boxQuantity?: number | null;
+  supportType?: string | null;
+  compatibleWithUnicanal?: boolean | null;
+  accessoryType?: string | null;
+  compatibleTool?: string | null;
+  application?: string | null;
+  presentation?: string | null;
+  material?: string | null;
+  dimDiameter?: string | null;
+  dimLength?: string | null;
   stock: number;
   /** Each element may be a populated object (depth≥1) or a bare ID string (depth=0) */
   images?: Array<{ image: PayloadMediaRef | string } | null> | null;
@@ -100,6 +136,9 @@ export function mapPayloadVariant(v: PayloadVariant): ProductVariant {
     price: v.price ?? 0,
     unitsPerPackage: v.unitsPerPackage ?? 1,
     stock: v.stock ?? 0,
+    variantSpec: v.variantSpec ?? null,
+    presentation: v.presentation ?? null,
+    unitLabel: v.unitLabel ?? null,
   };
 }
 
@@ -126,13 +165,46 @@ export function mapPayloadProduct(p: PayloadProduct): Product {
     brand: p.brand,
     model: p.model,
     category: p.category,
+    productLine: p.productLine ?? null,
     description: p.description,
     shortDescription: p.shortDescription ?? null,
     technicalSummary: p.technicalSummary ?? null,
-    amperage: p.amperage ?? 0,
-    poles: Number(p.poles) as Poles,
-    voltage: p.voltage ?? 0,
-    tripCurve: p.tripCurve,
+    // Interruptores — null when not applicable (non-breaker categories)
+    amperage: p.amperage ?? null,
+    poles: p.poles != null ? (Number(p.poles) as Poles) : null,
+    voltage: p.voltage ?? null,
+    tripCurve: p.tripCurve ?? null,
+    interruptingCapacity: p.interruptingCapacity ?? null,
+    mountingType: p.mountingType ?? null,
+    breakerType: p.breakerType ?? null,
+    frame: p.frame ?? null,
+    // Gabinetes y tableros
+    boardType: p.boardType ?? null,
+    nemaRating: p.nemaRating ?? null,
+    amperageCapacity: p.amperageCapacity ?? null,
+    enclosureUse: p.enclosureUse ?? null,
+    spaces: p.spaces ?? null,
+    circuits: p.circuits ?? null,
+    compatibleBreakerLine: p.compatibleBreakerLine ?? null,
+    // Unicanal
+    channelType: p.channelType ?? null,
+    gauge: p.gauge ?? null,
+    dimensions: p.dimensions ?? null,
+    length: p.length ?? null,
+    finish: p.finish ?? null,
+    customLengthAvailable: p.customLengthAvailable ?? null,
+    // Fijación / Soportería / Herramientas
+    anchorType: p.anchorType ?? null,
+    boxQuantity: p.boxQuantity ?? null,
+    supportType: p.supportType ?? null,
+    compatibleWithUnicanal: p.compatibleWithUnicanal ?? null,
+    accessoryType: p.accessoryType ?? null,
+    compatibleTool: p.compatibleTool ?? null,
+    application: p.application ?? null,
+    presentation: p.presentation ?? null,
+    material: p.material ?? null,
+    dimDiameter: p.dimDiameter ?? null,
+    dimLength: p.dimLength ?? null,
     stock: p.stock ?? 0,
     images: images.length > 0 ? images : ["/media/placeholder-breaker.svg"],
     datasheetUrl: datasheetDoc?.url ?? null,

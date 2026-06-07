@@ -103,6 +103,32 @@ export const Variants: CollectionConfig = {
       },
     },
     {
+      name: "variantSpec",
+      type: "text",
+      label: "Especificación de la variante",
+      admin: {
+        description:
+          "Valor exacto de este SKU que la diferencia de otras variantes. " +
+          'Ej. "63 A", "Calibre 14 · 4×2\\" · 3.05 m", "3/4\\" × 12\\"".',
+      },
+    },
+    {
+      name: "presentation",
+      type: "text",
+      label: "Presentación",
+      admin: {
+        description: 'Forma de venta. Ej. "Pieza", "Caja de 100", "Rollo 25 m".',
+      },
+    },
+    {
+      name: "unitLabel",
+      type: "text",
+      label: "Etiqueta de unidad",
+      admin: {
+        description: 'Unidad mostrada al cliente. Ej. "pza", "caja", "rollo", "m".',
+      },
+    },
+    {
       name: "isActive",
       type: "checkbox",
       label: "Variante activa",
