@@ -273,6 +273,27 @@ async function _payloadGetTicketById(id: string): Promise<Ticket | null> {
  */
 async function _payloadCreateTicket(input: TicketCreateInput): Promise<Ticket> {
   const payload = await getPayloadClient();
+
+  // `relations.product` is a relationship to `products` and expects the product
+  // ID, but callers pass a productSlug. Resolve slug → id (null when not found)
+  // so a product-linked ticket does not fail validation.
+  let productId: number | null = null;
+  if (input.productSlug) {
+    const found = await payload.find({
+      collection: "products",
+      where: { slug: { equals: input.productSlug } },
+      limit: 1,
+      depth: 0,
+    });
+    productId = (found.docs[0]?.id as number) ?? null;
+  }
+
+  // `relations.order` expects an order ID. Only forward a numeric-looking id.
+  const orderId =
+    input.orderId != null && /^\d+$/.test(String(input.orderId))
+      ? Number(input.orderId)
+      : null;
+
   const doc = await payload.create({
     collection: "tickets",
     data: {
@@ -287,8 +308,8 @@ async function _payloadCreateTicket(input: TicketCreateInput): Promise<Ticket> {
         customerEmail: input.customerEmail,
       },
       relations: {
-        product: input.productSlug ?? null,
-        order: input.orderId ?? null,
+        product: productId,
+        order: orderId,
       },
     },
   });
