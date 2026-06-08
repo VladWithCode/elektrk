@@ -40,13 +40,45 @@ import { searchProductsAction } from "@/app/(store)/products/actions";
 // Helpers
 // ---------------------------------------------------------------------------
 
+// Facet keys grouped by value type — keeps parse/serialize/default in sync.
+const STRING_FACETS = [
+  "category",
+  "brand",
+  "tripCurve",
+  "gauge",
+  "dimensions",
+  "channelType",
+  "finish",
+  "boardType",
+  "nemaRating",
+  "anchorType",
+  "supportType",
+  "accessoryType",
+  "dimDiameter",
+  "dimLength",
+] as const;
+
+const NUMBER_FACETS = ["amperage", "poles", "voltage", "amperageCapacity"] as const;
+
 const DEFAULT_FILTERS: FilterState = {
+  category: [],
+  brand: [],
   amperage: [],
   poles: [],
   voltage: [],
   tripCurve: [],
-  brand: [],
-  category: [],
+  gauge: [],
+  dimensions: [],
+  channelType: [],
+  finish: [],
+  boardType: [],
+  nemaRating: [],
+  amperageCapacity: [],
+  anchorType: [],
+  supportType: [],
+  accessoryType: [],
+  dimDiameter: [],
+  dimLength: [],
   search: "",
   sortBy: "name_asc",
 };
@@ -55,33 +87,34 @@ const VALID_SORT = new Set(["name_asc", "price_asc", "price_desc", "stock_desc"]
 
 /** Parse a FilterState from the current URL search params. */
 function parseFiltersFromSearchParams(params: URLSearchParams): FilterState {
-  const getAll = (key: string) => params.getAll(key);
   const getAllNum = (key: string) =>
-    getAll(key).map(Number).filter((n) => !isNaN(n));
+    params.getAll(key).map(Number).filter((n) => !isNaN(n));
 
   const rawSort = params.get("sortBy") ?? "name_asc";
 
-  return {
-    brand: getAll("brand"),
-    poles: getAllNum("poles") as FilterState["poles"],
-    voltage: getAllNum("voltage") as FilterState["voltage"],
-    tripCurve: getAll("tripCurve") as FilterState["tripCurve"],
-    amperage: getAllNum("amperage"),
-    category: getAll("category"),
+  const out: FilterState = {
+    ...DEFAULT_FILTERS,
     search: params.get("q") ?? "",
     sortBy: (VALID_SORT.has(rawSort) ? rawSort : "name_asc") as FilterState["sortBy"],
   };
+  for (const key of STRING_FACETS) {
+    (out[key] as string[]) = params.getAll(key);
+  }
+  for (const key of NUMBER_FACETS) {
+    (out[key] as number[]) = getAllNum(key);
+  }
+  return out;
 }
 
 /** Serialize a FilterState back to URL search params. */
 function serializeFiltersToParams(filters: FilterState): URLSearchParams {
   const p = new URLSearchParams();
-  filters.brand.forEach((v) => p.append("brand", v));
-  filters.poles.forEach((v) => p.append("poles", String(v)));
-  filters.voltage.forEach((v) => p.append("voltage", String(v)));
-  filters.tripCurve.forEach((v) => p.append("tripCurve", v));
-  filters.amperage.forEach((v) => p.append("amperage", String(v)));
-  filters.category.forEach((v) => p.append("category", v));
+  for (const key of STRING_FACETS) {
+    (filters[key] as string[]).forEach((v) => p.append(key, v));
+  }
+  for (const key of NUMBER_FACETS) {
+    (filters[key] as number[]).forEach((v) => p.append(key, String(v)));
+  }
   if (filters.sortBy && filters.sortBy !== "name_asc") p.set("sortBy", filters.sortBy);
   if (filters.search) p.set("q", filters.search);
   return p;
@@ -127,11 +160,10 @@ export function CatalogClient({ products, filterOptions }: CatalogClientProps) {
 
   // Count of active technical filters — shown as a badge on the trigger button.
   const activeFilterCount =
-    filters.amperage.length +
-    filters.poles.length +
-    filters.voltage.length +
-    filters.tripCurve.length +
-    filters.brand.length;
+    [...STRING_FACETS, ...NUMBER_FACETS].reduce(
+      (sum, key) => sum + (filters[key] as unknown[]).length,
+      0
+    );
 
   // Debounce timer for the search box.
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);

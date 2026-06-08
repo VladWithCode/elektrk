@@ -11,7 +11,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { FilterState } from "@/types/product";
+import type { FilterState, ProductCategory } from "@/types/product";
+import { CATEGORY_LABELS } from "@/types/product";
 import type { ProductFilterOptions } from "@/lib/repositories/products";
 import { cn } from "@/lib/utils";
 
@@ -52,6 +53,91 @@ function toggleValue<T>(arr: T[], val: T): T[] {
   return arr.includes(val) ? arr.filter((v) => v !== val) : [...arr, val];
 }
 
+// Keys of FilterState that are string[] / number[] facets we render generically.
+type StringFacetKey =
+  | "tripCurve"
+  | "gauge"
+  | "dimensions"
+  | "channelType"
+  | "finish"
+  | "boardType"
+  | "nemaRating"
+  | "anchorType"
+  | "supportType"
+  | "accessoryType"
+  | "dimDiameter"
+  | "dimLength";
+type NumberFacetKey = "amperage" | "poles" | "voltage" | "amperageCapacity";
+
+// A single facet to render: which FilterState key, which options list, label.
+interface FacetDef {
+  key: StringFacetKey | NumberFacetKey;
+  title: string;
+  options: ReadonlyArray<string | number>;
+  format?: (v: string | number) => string;
+}
+
+// Human labels for select-style coded values.
+const CHANNEL_TYPE_LABELS: Record<string, string> = { solido: "Sólido", perforado: "Perforado" };
+
+// Builds the facet list shown for the currently selected single category.
+function facetsForCategory(
+  category: ProductCategory | null,
+  o: ProductFilterOptions
+): FacetDef[] {
+  switch (category) {
+    case "interruptores":
+      return [
+        { key: "amperage", title: "Amperaje", options: o.amperages, format: (v) => `${v}A` },
+        { key: "poles", title: "Polos", options: o.poles as number[], format: (v) => `${v}P` },
+        { key: "voltage", title: "Voltaje", options: o.voltages, format: (v) => `${v}V` },
+        { key: "tripCurve", title: "Curva de disparo", options: o.tripCurves, format: (v) => `Curva ${v}` },
+      ];
+    case "unicanal":
+      return [
+        { key: "gauge", title: "Calibre", options: o.gauges, format: (v) => `Cal. ${v}` },
+        { key: "dimensions", title: "Medida", options: o.dimensions },
+        { key: "channelType", title: "Tipo", options: o.channelTypes, format: (v) => CHANNEL_TYPE_LABELS[String(v)] ?? String(v) },
+        { key: "finish", title: "Acabado", options: o.finishes },
+      ];
+    case "gabinetes_tableros":
+      return [
+        { key: "boardType", title: "Tipo de tablero", options: o.boardTypes },
+        { key: "nemaRating", title: "NEMA", options: o.nemaRatings, format: (v) => `NEMA ${String(v).toUpperCase()}` },
+        { key: "amperageCapacity", title: "Capacidad", options: o.amperageCapacities, format: (v) => `${v}A` },
+      ];
+    case "fijacion":
+      return [
+        { key: "anchorType", title: "Tipo de anclaje", options: o.anchorTypes },
+        { key: "dimDiameter", title: "Diámetro", options: o.dimDiameters },
+        { key: "dimLength", title: "Largo", options: o.dimLengths },
+      ];
+    case "soporteria":
+      return [
+        { key: "supportType", title: "Tipo de soporte", options: o.supportTypes },
+        { key: "dimDiameter", title: "Diámetro", options: o.dimDiameters },
+        { key: "dimLength", title: "Largo", options: o.dimLengths },
+      ];
+    case "herramientas_accesorios":
+      return [
+        { key: "accessoryType", title: "Tipo", options: o.accessoryTypes },
+        { key: "dimDiameter", title: "Diámetro", options: o.dimDiameters },
+        { key: "dimLength", title: "Largo", options: o.dimLengths },
+      ];
+    default:
+      return [];
+  }
+}
+
+// All facet keys that can hold a value — used to clear filters.
+const ALL_FACET_KEYS: Array<StringFacetKey | NumberFacetKey | "brand" | "category"> = [
+  "category", "brand",
+  "amperage", "poles", "voltage", "tripCurve",
+  "gauge", "dimensions", "channelType", "finish",
+  "boardType", "nemaRating", "amperageCapacity",
+  "anchorType", "supportType", "accessoryType", "dimDiameter", "dimLength",
+];
+
 export function ProductFilters({
   filters,
   onChange,
@@ -60,22 +146,24 @@ export function ProductFilters({
   filteredCount,
   className,
 }: ProductFiltersProps) {
-  const activeFilterCount =
-    filters.amperage.length +
-    filters.poles.length +
-    filters.voltage.length +
-    filters.tripCurve.length +
-    filters.brand.length;
+  // The selected category drives which technical facets are shown.
+  const selectedCategory: ProductCategory | null =
+    filters.category.length === 1 ? filters.category[0] : null;
 
-  const reset = () =>
-    onChange({
-      ...filters,
-      amperage: [],
-      poles: [],
-      voltage: [],
-      tripCurve: [],
-      brand: [],
-    });
+  const activeFilterCount = ALL_FACET_KEYS.reduce(
+    (sum, key) => sum + (filters[key] as unknown[]).length,
+    0
+  );
+
+  const facets = facetsForCategory(selectedCategory, filterOptions);
+
+  const reset = () => {
+    const cleared = { ...filters };
+    for (const key of ALL_FACET_KEYS) {
+      (cleared[key] as unknown[]) = [];
+    }
+    onChange(cleared);
+  };
 
   return (
     <aside className={cn("space-y-5", className)}>
@@ -132,7 +220,26 @@ export function ProductFilters({
 
       <Separator />
 
-      {/* Brand */}
+      {/* Category — primary facet */}
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-foreground uppercase tracking-wide">Categoría</p>
+        <div className="flex flex-wrap gap-1.5">
+          {filterOptions.categories.map((cat) => (
+            <FilterPill
+              key={cat}
+              label={CATEGORY_LABELS[cat] ?? cat}
+              active={filters.category.includes(cat)}
+              onClick={() =>
+                onChange({ ...filters, category: toggleValue(filters.category, cat) })
+              }
+            />
+          ))}
+        </div>
+      </div>
+
+      <Separator />
+
+      {/* Brand — common */}
       <div className="space-y-2">
         <p className="text-xs font-medium text-foreground uppercase tracking-wide">Marca</p>
         <div className="flex flex-wrap gap-1.5">
@@ -147,73 +254,41 @@ export function ProductFilters({
         </div>
       </div>
 
-      <Separator />
-
-      {/* Amperage */}
-      <div className="space-y-2">
-        <p className="text-xs font-medium text-foreground uppercase tracking-wide">Amperaje</p>
-        <div className="flex flex-wrap gap-1.5">
-          {filterOptions.amperages.map((amp) => (
-            <FilterPill
-              key={amp}
-              label={`${amp}A`}
-              active={filters.amperage.includes(amp)}
-              onClick={() => onChange({ ...filters, amperage: toggleValue(filters.amperage, amp) })}
-            />
+      {/* Category-specific facets — only when exactly one category is selected */}
+      {selectedCategory && facets.length > 0 &&
+        facets
+          .filter((f) => f.options.length > 0)
+          .map((facet) => (
+            <div key={facet.key}>
+              <Separator className="mb-5" />
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-foreground uppercase tracking-wide">
+                  {facet.title}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {facet.options.map((opt) => {
+                    const arr = filters[facet.key] as Array<string | number>;
+                    return (
+                      <FilterPill
+                        key={String(opt)}
+                        label={facet.format ? facet.format(opt) : String(opt)}
+                        active={arr.includes(opt)}
+                        onClick={() =>
+                          onChange({ ...filters, [facet.key]: toggleValue(arr, opt) })
+                        }
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
           ))}
-        </div>
-      </div>
 
-      <Separator />
-
-      {/* Poles */}
-      <div className="space-y-2">
-        <p className="text-xs font-medium text-foreground uppercase tracking-wide">Polos</p>
-        <div className="flex flex-wrap gap-1.5">
-          {filterOptions.poles.map((p) => (
-            <FilterPill
-              key={p}
-              label={`${p}P`}
-              active={filters.poles.includes(p)}
-              onClick={() => onChange({ ...filters, poles: toggleValue(filters.poles, p) })}
-            />
-          ))}
-        </div>
-      </div>
-
-      <Separator />
-
-      {/* Voltage */}
-      <div className="space-y-2">
-        <p className="text-xs font-medium text-foreground uppercase tracking-wide">Voltaje</p>
-        <div className="flex flex-wrap gap-1.5">
-          {filterOptions.voltages.map((v) => (
-            <FilterPill
-              key={v}
-              label={`${v}V`}
-              active={filters.voltage.includes(v)}
-              onClick={() => onChange({ ...filters, voltage: toggleValue(filters.voltage, v) })}
-            />
-          ))}
-        </div>
-      </div>
-
-      <Separator />
-
-      {/* Trip Curve */}
-      <div className="space-y-2">
-        <p className="text-xs font-medium text-foreground uppercase tracking-wide">Curva de disparo</p>
-        <div className="flex flex-wrap gap-1.5">
-          {filterOptions.tripCurves.map((curve) => (
-            <FilterPill
-              key={curve}
-              label={`Curva ${curve}`}
-              active={filters.tripCurve.includes(curve)}
-              onClick={() => onChange({ ...filters, tripCurve: toggleValue(filters.tripCurve, curve) })}
-            />
-          ))}
-        </div>
-      </div>
+      {!selectedCategory && (
+        <p className="text-xs text-muted-foreground/70">
+          Selecciona una categoría para ver filtros técnicos específicos.
+        </p>
+      )}
     </aside>
   );
 }

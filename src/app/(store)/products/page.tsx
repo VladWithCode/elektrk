@@ -54,7 +54,7 @@ function parseInitialFilters(params: RawParams): Partial<FilterState> {
   if (amperage.length) filters.amperage = amperage;
 
   const category = toStringArray(params.category);
-  if (category.length) filters.category = category;
+  if (category.length) filters.category = category as FilterState["category"];
 
   if (params.q && typeof params.q === "string") filters.search = params.q;
 

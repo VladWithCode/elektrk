@@ -11,7 +11,8 @@ import { SectionHeader } from "@/components/shared/SectionHeader";
 import { AnimatedSection } from "@/components/shared/AnimatedSection";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { SPEC_LABELS } from "@/lib/constants";
+import { CATEGORY_LABELS } from "@/types/product";
+import { getProductSpecs, getProductPills } from "@/lib/product-specs";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -70,18 +71,21 @@ export default async function ProductDetailPage({ params }: Props) {
   if (!product) notFound();
 
   const related = allProducts
-    .filter((p) => p.id !== product.id && (p.brand === product.brand || p.poles === product.poles))
+    .filter(
+      (p) =>
+        p.id !== product.id &&
+        (p.category === product.category || p.brand === product.brand)
+    )
     .slice(0, 4);
 
-  const specs: [string, string | number][] = [
-    ["brand", product.brand],
-    ["model", product.model],
-    ["amperage", `${product.amperage} A`],
-    ["poles", `${product.poles} ${product.poles === 1 ? "polo" : "polos"}`],
-    ["voltage", `${product.voltage} V`],
-    ["tripCurve", `Curva ${product.tripCurve}`],
-    ["category", product.category],
+  // Common rows + category-specific rows (only present fields).
+  const specs: { label: string; value: string }[] = [
+    { label: "Marca", value: product.brand },
+    { label: "Modelo", value: product.model },
+    { label: "Categoría", value: CATEGORY_LABELS[product.category] ?? product.category },
+    ...getProductSpecs(product),
   ];
+  const pills = getProductPills(product);
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
@@ -121,7 +125,7 @@ export default async function ProductDetailPage({ params }: Props) {
                   <Zap className="h-12 w-12 text-primary/50" />
                 </div>
                 <div className="flex gap-2">
-                  {Array.from({ length: product.poles }).map((_, i) => (
+                  {Array.from({ length: product.poles ?? 0 }).map((_, i) => (
                     <div key={i} className="w-5 h-5 rounded-sm bg-primary/30" />
                   ))}
                 </div>
@@ -147,22 +151,19 @@ export default async function ProductDetailPage({ params }: Props) {
             <p className="text-sm text-muted-foreground mt-1 font-mono">{product.model}</p>
           </div>
 
-          {/* Spec pills */}
-          <div className="flex flex-wrap gap-2">
-            {[
-              `${product.amperage}A`,
-              `${product.poles}P`,
-              `${product.voltage}V`,
-              `Curva ${product.tripCurve}`,
-            ].map((spec) => (
-              <span
-                key={spec}
-                className="px-2.5 py-1 rounded-full bg-muted text-xs font-mono font-medium text-muted-foreground"
-              >
-                {spec}
-              </span>
-            ))}
-          </div>
+          {/* Spec pills — category-aware */}
+          {pills.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {pills.map((spec) => (
+                <span
+                  key={spec}
+                  className="px-2.5 py-1 rounded-full bg-muted text-xs font-mono font-medium text-muted-foreground"
+                >
+                  {spec}
+                </span>
+              ))}
+            </div>
+          )}
 
           <p className="text-sm text-muted-foreground leading-relaxed">
             {product.description}
@@ -181,15 +182,15 @@ export default async function ProductDetailPage({ params }: Props) {
         <div className="rounded-xl border border-border overflow-hidden">
           <table className="w-full text-sm">
             <tbody>
-              {specs.map(([key, val], i) => (
+              {specs.map((row, i) => (
                 <tr
-                  key={key}
+                  key={row.label}
                   className={i % 2 === 0 ? "bg-muted/40" : "bg-card"}
                 >
                   <td className="px-4 py-3 font-medium text-muted-foreground w-40 sm:w-52">
-                    {SPEC_LABELS[key] ?? key}
+                    {row.label}
                   </td>
-                  <td className="px-4 py-3 text-foreground font-mono">{val}</td>
+                  <td className="px-4 py-3 text-foreground font-mono">{row.value}</td>
                 </tr>
               ))}
             </tbody>

@@ -7,7 +7,7 @@ export const MOCK_PRODUCTS: Product[] = [
     name: "Interruptor Termomagnético 1P 10A Curva C",
     brand: "Siemens",
     model: "5SL6110-7",
-    category: "Interruptores Termomagnéticos",
+    category: "interruptores",
     description:
       "Interruptor automático en caja moldeada de 1 polo para protección de circuitos de distribución. Curva C para cargas inductivas. Capacidad de ruptura 6kA.",
     shortDescription: "Breaker monofásico 10A Curva C — ideal para circuitos residenciales de alumbrado y tomacorrientes.",
@@ -50,7 +50,7 @@ export const MOCK_PRODUCTS: Product[] = [
     name: "Interruptor Termomagnético 2P 16A Curva C",
     brand: "Siemens",
     model: "5SL6216-7",
-    category: "Interruptores Termomagnéticos",
+    category: "interruptores",
     description:
       "Interruptor bipolar para protección de circuitos de alumbrado y pequeña fuerza motriz. Alta capacidad de ruptura, accionamiento simultáneo de ambos polos.",
     shortDescription: "Breaker bipolar 16A Curva C — accionamiento simultáneo en ambos polos para instalaciones residenciales.",
@@ -93,7 +93,7 @@ export const MOCK_PRODUCTS: Product[] = [
     name: "Interruptor Termomagnético 3P 25A Curva C",
     brand: "Schneider Electric",
     model: "iK60N C25",
-    category: "Interruptores Termomagnéticos",
+    category: "interruptores",
     description:
       "Interruptor tripolar de la gama iK60N para protección de motores y equipos trifásicos. Diseño compacto, fácil instalación en riel DIN.",
     shortDescription: "Breaker tripolar 25A Curva C — protección trifásica compacta para motores y tableros industriales.",
@@ -144,7 +144,7 @@ export const MOCK_PRODUCTS: Product[] = [
     name: "Interruptor Termomagnético 1P 6A Curva B",
     brand: "ABB",
     model: "S201-B6",
-    category: "Interruptores Termomagnéticos",
+    category: "interruptores",
     description:
       "Interruptor automático S200 de ABB, curva B para cargas resistivas sensibles y protección de circuitos electrónicos y de control.",
     shortDescription: "Breaker monofásico 6A Curva B — disparo sensible para protección de circuitos electrónicos y de control.",
@@ -187,7 +187,7 @@ export const MOCK_PRODUCTS: Product[] = [
     name: "Interruptor Termomagnético 1P 32A Curva D",
     brand: "Schneider Electric",
     model: "iK60N D32",
-    category: "Interruptores Termomagnéticos",
+    category: "interruptores",
     description:
       "Curva D para protección de cargas con altas corrientes de arranque: compresores, motores de elevación, transformadores. Disparo magnético retardado.",
     shortDescription: "Breaker monofásico 32A Curva D — soporta altas corrientes de arranque en compresores y motores.",
@@ -222,7 +222,7 @@ export const MOCK_PRODUCTS: Product[] = [
     name: "Interruptor Termomagnético 4P 32A Curva C",
     brand: "Siemens",
     model: "5SL6432-7",
-    category: "Interruptores Termomagnéticos",
+    category: "interruptores",
     description:
       "Interruptor tetrapolar para instalaciones trifásicas con neutro. Protege circuitos de 4 conductores con accionamiento simultáneo de los 4 polos.",
     shortDescription: "Breaker tetrapolar 32A Curva C — protección trifásica + neutro con desconexión simultánea de 4 polos.",
@@ -265,7 +265,7 @@ export const MOCK_PRODUCTS: Product[] = [
     name: "Interruptor Termomagnético 2P 20A Curva C",
     brand: "ABB",
     model: "S202-C20",
-    category: "Interruptores Termomagnéticos",
+    category: "interruptores",
     description:
       "Interruptor bipolar S200 de ABB para aplicaciones residenciales y comerciales. Diseño modular compacto, 2 módulos de 18mm en riel DIN.",
     shortDescription: "Breaker bipolar 20A Curva C de ABB — diseño compacto para aplicaciones residenciales y comerciales.",
@@ -308,7 +308,7 @@ export const MOCK_PRODUCTS: Product[] = [
     name: "Interruptor Termomagnético 3P 63A Curva C",
     brand: "Schneider Electric",
     model: "iK60N C63",
-    category: "Interruptores Termomagnéticos",
+    category: "interruptores",
     description:
       "Protección de circuitos de fuerza para motores y cargas industriales de gran porte. Alta capacidad de ruptura 6kA, adecuado para instalaciones en tableros.",
     shortDescription: "Breaker tripolar 63A Curva C — protección de alta potencia para circuitos industriales y tableros de fuerza.",
