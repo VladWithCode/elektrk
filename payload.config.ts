@@ -24,6 +24,9 @@ import { Tickets } from "./src/collections/Tickets";
 // Globals
 import { Settings } from "./src/globals/Settings";
 
+// Endpoints
+import { importCatalogEndpoints } from "./src/endpoints/import-catalog";
+
 const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
 
@@ -41,7 +44,21 @@ export default buildConfig({
     importMap: {
       baseDir: path.resolve(dirname),
     },
+    components: {
+      afterNavLinks: [
+        "/src/components/import-catalog/ImportCatalogNavLink#ImportCatalogNavLink",
+      ],
+      views: {
+        importCatalog: {
+          Component:
+            "/src/components/import-catalog/ImportCatalogView#ImportCatalogView",
+          path: "/import-products",
+        },
+      },
+    },
   },
+
+  endpoints: importCatalogEndpoints,
 
   collections: [
     // Auth
