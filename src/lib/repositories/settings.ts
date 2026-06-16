@@ -18,9 +18,10 @@
  *   breaks on a fresh install.
  */
 
-import { unstable_noStore as noStore } from "next/cache";
+import { unstable_cache } from "next/cache";
 import { MOCK_SETTINGS } from "@/data/mock-settings";
 import type { StorefrontSettings } from "@/data/mock-settings";
+import { SETTINGS_CACHE_TAG } from "@/lib/cache-tags";
 
 // ---------------------------------------------------------------------------
 // DATA_SOURCE resolution (mirrors the pattern in products.ts)
@@ -136,25 +137,37 @@ function mapPayloadSettings(raw: RawPayloadSettings): StorefrontSettings {
  * When DATA_SOURCE=mock:
  *   Returns MOCK_SETTINGS directly — no DB required.
  */
-export async function getStoreSettings(): Promise<StorefrontSettings> {
-  // Opt out of Next.js static generation — settings can change in Payload Admin
-  // at any time and must always reflect the current Global value on each request.
-  noStore();
+/**
+ * Cached Payload read of the "settings" Global.
+ *
+ * Tagged with SETTINGS_CACHE_TAG so the storefront stays statically renderable.
+ * The Settings Global's afterChange hook calls revalidateTag(SETTINGS_CACHE_TAG)
+ * so an admin save is reflected on the next request — no per-request DB read and,
+ * critically, no static-generation bailout in the (store) layout that consumes it.
+ */
+const getCachedPayloadSettings = unstable_cache(
+  async (): Promise<StorefrontSettings> => {
+    const payload = await getPayloadClient();
 
+    // findGlobal reads the "settings" global; overrideAccess bypasses isAdmin
+    const raw = (await payload.findGlobal({
+      slug: "settings",
+      depth: 0,
+      overrideAccess: true,
+    })) as RawPayloadSettings;
+
+    return mapPayloadSettings(raw ?? {});
+  },
+  ["store-settings"],
+  { tags: [SETTINGS_CACHE_TAG] },
+);
+
+export async function getStoreSettings(): Promise<StorefrontSettings> {
   if (resolveDataSource() !== "payload") {
     return MOCK_SETTINGS;
   }
 
-  const payload = await getPayloadClient();
-
-  // findGlobal reads the "settings" global; overrideAccess bypasses isAdmin
-  const raw = (await payload.findGlobal({
-    slug: "settings",
-    depth: 0,
-    overrideAccess: true,
-  })) as RawPayloadSettings;
-
-  return mapPayloadSettings(raw ?? {});
+  return getCachedPayloadSettings();
 }
 
 /**

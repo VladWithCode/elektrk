@@ -1,5 +1,7 @@
 import type { GlobalConfig } from "payload";
+import { revalidateTag } from "next/cache";
 import { isAdmin } from "../lib/payload-access";
+import { SETTINGS_CACHE_TAG } from "../lib/cache-tags";
 
 export const Settings: GlobalConfig = {
   slug: "settings",
@@ -11,6 +13,21 @@ export const Settings: GlobalConfig = {
   access: {
     read: isAdmin,
     update: isAdmin,
+  },
+  hooks: {
+    afterChange: [
+      () => {
+        // The storefront reads settings via a cached, tagged reader so its
+        // pages stay statically renderable. Bust that cache on every save so
+        // changes appear on the next request. { expire: 0 } expires immediately.
+        try {
+          revalidateTag(SETTINGS_CACHE_TAG, { expire: 0 });
+        } catch {
+          // revalidateTag throws outside a Next request/render context
+          // (e.g. Payload CLI migrations/seeds). Safe to ignore there.
+        }
+      },
+    ],
   },
   fields: [
     // -------------------------------------------------------------------------
