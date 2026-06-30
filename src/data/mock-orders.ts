@@ -20,6 +20,7 @@ export const MOCK_CUSTOMER_EMAIL   = "cliente@ejemplo.com";
 export const MOCK_ORDER_DETAILS: OrderDetail[] = [
   {
     id: "ORD-001",
+    orderNumber: "ORD-000001",
     createdAt: "2024-05-10T14:30:00.000Z",
     displayDate: "10 may. 2024",
     status: "fulfilled",
@@ -29,8 +30,6 @@ export const MOCK_ORDER_DETAILS: OrderDetail[] = [
     itemCount: 2,
     customerEmail: MOCK_CUSTOMER_EMAIL,
     customerAuthId: MOCK_CUSTOMER_AUTH_ID,
-    stripeCheckoutSessionId: null,
-    stripePaymentIntentId: null,
     notes: null,
     shippingAddress: {
       name: "Juan Pérez",
@@ -67,6 +66,7 @@ export const MOCK_ORDER_DETAILS: OrderDetail[] = [
   },
   {
     id: "ORD-002",
+    orderNumber: "ORD-000002",
     createdAt: "2024-06-01T09:15:00.000Z",
     displayDate: "1 jun. 2024",
     status: "paid",
@@ -76,8 +76,6 @@ export const MOCK_ORDER_DETAILS: OrderDetail[] = [
     itemCount: 1,
     customerEmail: MOCK_CUSTOMER_EMAIL,
     customerAuthId: MOCK_CUSTOMER_AUTH_ID,
-    stripeCheckoutSessionId: null,
-    stripePaymentIntentId: null,
     notes: null,
     shippingAddress: {
       name: "Juan Pérez",
@@ -103,6 +101,7 @@ export const MOCK_ORDER_DETAILS: OrderDetail[] = [
   },
   {
     id: "ORD-003",
+    orderNumber: "ORD-000003",
     createdAt: "2024-04-20T16:00:00.000Z",
     displayDate: "20 abr. 2024",
     status: "cancelled",
@@ -112,8 +111,6 @@ export const MOCK_ORDER_DETAILS: OrderDetail[] = [
     itemCount: 1,
     customerEmail: MOCK_CUSTOMER_EMAIL,
     customerAuthId: MOCK_CUSTOMER_AUTH_ID,
-    stripeCheckoutSessionId: null,
-    stripePaymentIntentId: null,
     notes: "Cancelado por el cliente antes del envío.",
     shippingAddress: null,
     items: [
@@ -137,8 +134,9 @@ export const MOCK_ORDER_DETAILS: OrderDetail[] = [
 // ---------------------------------------------------------------------------
 
 export const MOCK_ORDER_SUMMARIES: OrderSummary[] = MOCK_ORDER_DETAILS.map(
-  ({ id, createdAt, displayDate, status, total, itemCount, customerEmail }) => ({
+  ({ id, orderNumber, createdAt, displayDate, status, total, itemCount, customerEmail }) => ({
     id,
+    orderNumber,
     createdAt,
     displayDate,
     status,
@@ -174,8 +172,9 @@ export function getMockRecentOrders(
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     )
     .slice(0, limit)
-    .map(({ id, createdAt, displayDate, status, total, itemCount, customerEmail }) => ({
+    .map(({ id, orderNumber, createdAt, displayDate, status, total, itemCount, customerEmail }) => ({
       id,
+      orderNumber,
       createdAt,
       displayDate,
       status,

@@ -87,6 +87,17 @@ export const OrderItems: CollectionConfig = {
         readOnly: true,
       },
     },
+    {
+      name: "variantLabelSnapshot",
+      type: "text",
+      label: "Variante (snapshot)",
+      admin: {
+        description:
+          "Copia de la etiqueta de la variante (ej. «Caja × 10 piezas») al momento " +
+          "de la compra. No editar.",
+        readOnly: true,
+      },
+    },
 
     // -------------------------------------------------------------------------
     // Quantities and pricing

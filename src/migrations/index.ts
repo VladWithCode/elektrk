@@ -7,6 +7,7 @@ import * as migration_20260603_225848_soft_delete from './20260603_225848_soft_d
 import * as migration_20260604_012045_add_uploadthing_storage_fields from './20260604_012045_add_uploadthing_storage_fields';
 import * as migration_20260606_soft_delete_media from './20260606_soft_delete_media';
 import * as migration_20260607_164229_add_product_category_specs from './20260607_164229_add_product_category_specs';
+import * as migration_20260630_whatsapp_orders from './20260630_whatsapp_orders';
 
 export const migrations = [
   {
@@ -53,5 +54,10 @@ export const migrations = [
     up: migration_20260606_soft_delete_media.up,
     down: migration_20260606_soft_delete_media.down,
     name: '20260606_soft_delete_media',
+  },
+  {
+    up: migration_20260630_whatsapp_orders.up,
+    down: migration_20260630_whatsapp_orders.down,
+    name: '20260630_whatsapp_orders',
   },
 ];

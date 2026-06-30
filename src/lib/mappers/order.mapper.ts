@@ -4,14 +4,15 @@
  * Converts raw Payload CMS order documents into storefront
  * OrderSummary / OrderDetail types.
  *
- * Payload shape (src/collections/Orders.ts + OrderItems.ts) — Phase 10B:
+ * Payload shape (src/collections/Orders.ts + OrderItems.ts):
  *
  *   Orders:
- *     - id, status, createdAt, updatedAt
- *     - customer group:  { customerAuthId, customerEmail }
+ *     - id, orderNumber, status, createdAt, updatedAt
+ *     - customer group:  { customerName, customerAuthId, customerEmail }
+ *     - shipping group:  { name, address, city, state, postalCode, phone }
  *     - pricing group:   { subtotal, shipping, total, taxIncluded }
- *     - stripe group:    { stripePaymentIntentId, stripeCheckoutSessionId }
- *     - internalNotes    (top-level text)
+ *     - notes            (buyer notes, customer-facing)
+ *     - internalNotes    (admin-only — never mapped to OrderDetail)
  *     - items join → OrderItems[] (populated at depth ≥ 1 as { docs: [...] })
  *
  *   OrderItems:
@@ -32,6 +33,7 @@ import type {
   ShippingAddress,
 } from "@/types/order";
 import { isValidOrderStatus, ORDER_STATUS_LABELS } from "@/types/order";
+import { formatOrderNumber } from "@/lib/whatsapp/order-message";
 
 // ---------------------------------------------------------------------------
 // Raw Payload shapes — aligned with actual collections
@@ -46,18 +48,31 @@ export interface RawPayloadOrderItem {
   /** Snapshot fields — flat, not nested in a group. */
   productNameSnapshot?: unknown;
   variantSkuSnapshot?: unknown;
+  variantLabelSnapshot?: unknown;
 }
 
 export interface RawPayloadOrder {
   id: string;
+  orderNumber?: unknown;
   status?: unknown;
   createdAt?: unknown;
   updatedAt?: unknown;
 
-  /** customer group: { customerAuthId, customerEmail } */
+  /** customer group: { customerName, customerAuthId, customerEmail } */
   customer?: {
+    customerName?: unknown;
     customerAuthId?: unknown;
     customerEmail?: unknown;
+  };
+
+  /** shipping group: { name, address, city, state, postalCode, phone } */
+  shipping?: {
+    name?: unknown;
+    address?: unknown;
+    city?: unknown;
+    state?: unknown;
+    postalCode?: unknown;
+    phone?: unknown;
   };
 
   /** pricing group: { subtotal, shipping, total, taxIncluded } */
@@ -68,14 +83,8 @@ export interface RawPayloadOrder {
     taxIncluded?: unknown;
   };
 
-  /** stripe group: { stripePaymentIntentId, stripeCheckoutSessionId } */
-  stripe?: {
-    stripePaymentIntentId?: unknown;
-    stripeCheckoutSessionId?: unknown;
-  };
-
-  /** Admin-only internal notes field. */
-  internalNotes?: unknown;
+  /** Buyer-facing delivery notes. */
+  notes?: unknown;
 
   /**
    * Populated join — Payload v3 join fields return { docs: [...], hasNextPage: bool }
@@ -93,9 +102,9 @@ export function mapPayloadOrderItem(raw: RawPayloadOrderItem): OrderItemSummary 
     id: raw.id,
     productName: str(raw.productNameSnapshot) ?? "Producto",
     // productSlug and imageUrl are not stored in the OrderItems collection —
-    // these are intentional nulls; snapshots preserve name/sku/price only.
+    // these are intentional nulls; snapshots preserve name/sku/label/price only.
     productSlug: null,
-    variantLabel: "",
+    variantLabel: str(raw.variantLabelSnapshot) ?? "",
     variantSku: str(raw.variantSkuSnapshot) ?? "",
     unitPrice: num(raw.unitPrice),
     quantity: num(raw.quantity, 1),
@@ -122,11 +131,11 @@ export function mapPayloadOrder(raw: RawPayloadOrder): OrderDetail {
   const shipping = num(raw.pricing?.shipping);
   const total = num(raw.pricing?.total) || subtotal + shipping;
 
-  // The Orders collection has no shipping address group (added in a later phase).
-  const shippingAddress: ShippingAddress | null = null;
+  const shippingAddress = mapShippingAddress(raw.shipping);
 
   return {
     id: raw.id,
+    orderNumber: str(raw.orderNumber) ?? formatOrderNumber(raw.id),
     createdAt,
     displayDate,
     status,
@@ -138,9 +147,32 @@ export function mapPayloadOrder(raw: RawPayloadOrder): OrderDetail {
     customerAuthId: str(raw.customer?.customerAuthId) ?? "",
     items,
     shippingAddress,
-    stripeCheckoutSessionId: str(raw.stripe?.stripeCheckoutSessionId),
-    stripePaymentIntentId: str(raw.stripe?.stripePaymentIntentId),
-    notes: str(raw.internalNotes),
+    notes: str(raw.notes),
+  };
+}
+
+/**
+ * Builds a ShippingAddress from the Orders `shipping` group.
+ * Returns null when no shipping data was captured (e.g. legacy orders).
+ */
+function mapShippingAddress(
+  shipping: RawPayloadOrder["shipping"]
+): ShippingAddress | null {
+  if (!shipping) return null;
+  const name = str(shipping.name);
+  const address = str(shipping.address);
+  const city = str(shipping.city);
+  const state = str(shipping.state);
+  const postalCode = str(shipping.postalCode);
+  // Treat the address as present only when there is something meaningful.
+  if (!name && !address && !city && !state && !postalCode) return null;
+  return {
+    name: name ?? "",
+    address: address ?? "",
+    city: city ?? "",
+    state: state ?? "",
+    postalCode: postalCode ?? "",
+    phone: str(shipping.phone),
   };
 }
 
@@ -157,6 +189,7 @@ export function mapPayloadOrderToSummary(raw: RawPayloadOrder): OrderSummary {
 
   return {
     id: raw.id,
+    orderNumber: str(raw.orderNumber) ?? formatOrderNumber(raw.id),
     createdAt,
     displayDate,
     status,
@@ -219,10 +252,6 @@ function formatDisplayDate(iso: string): string {
     return iso;
   }
 }
-
-// Unused but kept to satisfy the ShippingAddress import (used in mapPayloadOrder return type)
-const _shippingAddressTypeCheck: ShippingAddress | null = null;
-void _shippingAddressTypeCheck;
 
 // Re-export for convenience
 export { ORDER_STATUS_LABELS };

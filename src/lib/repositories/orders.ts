@@ -10,11 +10,11 @@
  * restricts access to admin users only. The customerAuthId filter ensures
  * customers only receive their own orders.
  *
- * Phase 11B additions:
- *   ✓ updateOrderStripeSession  — saves stripeCheckoutSessionId right after session creation
- *   ✓ updateOrderAfterPayment   — called by webhook on checkout.session.completed
- *   ✓ decrementOrderItemsStock  — called by webhook to reduce variant stock after payment
- *   ✓ updateOrderStatus         — generic status update (expired, failed)
+ * WhatsApp flow: createOrder persists a "pending" order with structured
+ * customer + shipping data. The order is initiated by the buyer sending a
+ * WhatsApp message; the admin then requests payment and updates the status
+ * from the dashboard. Stock is decremented by the Orders collection
+ * afterChange hook when the status transitions to "paid".
  */
 
 import type {
@@ -23,6 +23,7 @@ import type {
   OrderCreateInput,
   CreateOrderResult,
 } from "@/types/order";
+import { formatOrderNumber } from "@/lib/whatsapp/order-message";
 import {
   getMockOrdersByCustomer,
   getMockRecentOrders,
@@ -93,8 +94,9 @@ export async function getOrderSummariesByCustomer(
     .sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     )
-    .map(({ id, createdAt, displayDate, status, total, itemCount, customerEmail }) => ({
+    .map(({ id, orderNumber, createdAt, displayDate, status, total, itemCount, customerEmail }) => ({
       id,
+      orderNumber,
       createdAt,
       displayDate,
       status,
@@ -195,20 +197,31 @@ export async function createOrder(
 ): Promise<CreateOrderResult> {
   if (dataSource() !== "payload") {
     // Mock mode — return a fake orderId so the UI still works in development
-    return { orderId: `mock-${Date.now()}` };
+    const mockId = `mock-${Date.now()}`;
+    return { orderId: mockId, orderNumber: formatOrderNumber(mockId) };
   }
 
   const payload = await getPayloadClient();
 
   // --- 1. Create the parent Order ---
+  // The Orders afterChange hook backfills `orderNumber` from the serial id.
   const order = await payload.create({
     collection: "orders",
     overrideAccess: true,
     data: {
       status: "pending",
       customer: {
+        customerName: input.shippingName,
         customerAuthId: input.customerAuthId,
         customerEmail: input.customerEmail,
+      },
+      shipping: {
+        name: input.shippingName,
+        address: input.shippingAddress,
+        city: input.shippingCity,
+        state: input.shippingState,
+        postalCode: input.shippingPostalCode,
+        phone: input.shippingPhone || null,
       },
       pricing: {
         subtotal: input.subtotal,
@@ -216,11 +229,7 @@ export async function createOrder(
         total: input.total,
         taxIncluded: true,
       },
-      stripe: {
-        stripePaymentIntentId: null,
-        stripeCheckoutSessionId: null,
-      },
-      internalNotes: _buildInternalNotes(input),
+      notes: input.notes || null,
     },
   });
 
@@ -250,6 +259,7 @@ export async function createOrder(
           variant: variantId,
           productNameSnapshot: item.productName,
           variantSkuSnapshot: item.variantSku,
+          variantLabelSnapshot: item.variantLabel,
           quantity: item.quantity,
           unitPrice: item.price,
           total: item.price * item.quantity,
@@ -258,7 +268,7 @@ export async function createOrder(
     })
   );
 
-  return { orderId };
+  return { orderId, orderNumber: formatOrderNumber(orderId) };
 }
 
 // ---------------------------------------------------------------------------
@@ -270,12 +280,12 @@ export async function getOrderFilters(): Promise<{
 }> {
   return {
     statuses: [
-      { value: "all",       label: "Todos"      },
-      { value: "pending",   label: "Pendiente"  },
-      { value: "paid",      label: "Pagado"     },
-      { value: "fulfilled", label: "Entregado"  },
-      { value: "cancelled", label: "Cancelado"  },
-      { value: "failed",    label: "Fallido"    },
+      { value: "all",             label: "Todas"           },
+      { value: "pending",         label: "Recibida"        },
+      { value: "payment_pending", label: "Pago solicitado" },
+      { value: "paid",            label: "Pago confirmado"  },
+      { value: "fulfilled",       label: "Entregada"        },
+      { value: "cancelled",       label: "Cancelada"        },
     ],
   };
 }
@@ -347,81 +357,18 @@ async function _payloadGetRecentOrders(
 }
 
 // ---------------------------------------------------------------------------
-// Private helpers
+// Status lifecycle helper
 // ---------------------------------------------------------------------------
-
-/** Pack shipping address + notes into internalNotes for the Phase 10B schema
- *  (Orders collection has no dedicated shipping address group yet). */
-function _buildInternalNotes(input: OrderCreateInput): string {
-  const lines: string[] = [
-    `Envío a: ${input.shippingName}`,
-    `${input.shippingAddress}, ${input.shippingCity}, ${input.shippingState} ${input.shippingPostalCode}`,
-  ];
-  if (input.shippingPhone) lines.push(`Tel: ${input.shippingPhone}`);
-  if (input.notes) lines.push(`Nota del cliente: ${input.notes}`);
-  return lines.join("\n");
-}
-
-// ---------------------------------------------------------------------------
-// Phase 11B — Stripe / payment lifecycle helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Saves the Stripe Checkout Session ID on the Order immediately after the
- * session is created (before the user is redirected to Stripe).
- * No-op in mock mode.
- */
-export async function updateOrderStripeSession(
-  orderId: string,
-  stripeCheckoutSessionId: string
-): Promise<void> {
-  if (dataSource() !== "payload") return;
-  const payload = await getPayloadClient();
-  await payload.update({
-    collection: "orders",
-    id: orderId,
-    overrideAccess: true,
-    data: {
-      stripe: { stripeCheckoutSessionId, stripePaymentIntentId: null },
-    },
-  });
-}
-
-/**
- * Updates Order status + Stripe IDs after a confirmed payment.
- * Called from the checkout.session.completed webhook handler.
- */
-export async function updateOrderAfterPayment(
-  orderId: string,
-  data: {
-    status: "paid" | "failed" | "cancelled";
-    stripeCheckoutSessionId: string;
-    stripePaymentIntentId: string | null;
-  }
-): Promise<void> {
-  if (dataSource() !== "payload") return;
-  const payload = await getPayloadClient();
-  await payload.update({
-    collection: "orders",
-    id: orderId,
-    overrideAccess: true,
-    data: {
-      status: data.status,
-      stripe: {
-        stripeCheckoutSessionId: data.stripeCheckoutSessionId,
-        stripePaymentIntentId: data.stripePaymentIntentId ?? null,
-      },
-    },
-  });
-}
 
 /**
  * Updates only the status field of an Order.
- * Used for cancelled / failed / expired transitions.
+ *
+ * Stock is decremented automatically by the Orders collection afterChange hook
+ * when the status transitions to "paid" — callers do not handle stock here.
  */
 export async function updateOrderStatus(
   orderId: string,
-  status: "pending" | "paid" | "failed" | "cancelled" | "fulfilled"
+  status: "pending" | "payment_pending" | "paid" | "fulfilled" | "cancelled"
 ): Promise<void> {
   if (dataSource() !== "payload") return;
   const payload = await getPayloadClient();
@@ -431,73 +378,6 @@ export async function updateOrderStatus(
     overrideAccess: true,
     data: { status },
   });
-}
-
-/**
- * Decrements variant stock for every OrderItem belonging to `orderId`.
- *
- * Strategy:
- *   - Fetch all order-items where order = orderId (depth 0 — IDs only).
- *   - For each item, read the linked Variant, subtract quantity (floor 0).
- *   - Update Variant.stock in Payload.
- *   - Products.stock is NOT modified here — it is admin-managed separately.
- *
- * Failures per-item are logged but do not abort the rest; the webhook still
- * returns success so Stripe won't retry the payment-confirmation event.
- */
-export async function decrementOrderItemsStock(orderId: string): Promise<void> {
-  if (dataSource() !== "payload") return;
-  const payload = await getPayloadClient();
-
-  // 1. Fetch all order-items for this order
-  const itemsResult = await payload.find({
-    collection: "order-items",
-    where: { order: { equals: orderId } },
-    limit: 100,
-    depth: 1, // depth 1 to populate the `variant` relationship
-    overrideAccess: true,
-  });
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const items = itemsResult.docs as any[];
-
-  await Promise.allSettled(
-    items.map(async (item) => {
-      try {
-        const quantity: number = typeof item.quantity === "number" ? item.quantity : 0;
-        if (quantity <= 0) return;
-
-        // The `variant` field is populated at depth 1 — it's the variant doc
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const variantDoc = item.variant as any;
-        if (!variantDoc?.id) {
-          console.warn(`[orders.decrementStock] No variant on order-item ${item.id}`);
-          return;
-        }
-
-        const currentStock: number =
-          typeof variantDoc.stock === "number" ? variantDoc.stock : 0;
-        const newStock = Math.max(0, currentStock - quantity);
-
-        await payload.update({
-          collection: "variants",
-          id: variantDoc.id,
-          overrideAccess: true,
-          data: { stock: newStock },
-        });
-
-        console.log(
-          `[orders.decrementStock] variant ${variantDoc.id} (${variantDoc.sku}): ` +
-            `${currentStock} → ${newStock} (−${quantity})`
-        );
-      } catch (err) {
-        console.error(
-          `[orders.decrementStock] Failed for order-item ${item.id}:`,
-          err instanceof Error ? err.message : err
-        );
-      }
-    })
-  );
 }
 
 // Re-export mapper types for callers that receive raw Payload docs

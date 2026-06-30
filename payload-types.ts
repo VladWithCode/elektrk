@@ -195,8 +195,6 @@ export interface Media {
    * Fecha y hora en que se marcó como eliminado.
    */
   deletedAt?: string | null;
-  _key?: string | null;
-  prefix?: string | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -210,7 +208,6 @@ export interface Media {
   focalY?: number | null;
   sizes?: {
     thumbnail?: {
-      _key?: string | null;
       url?: string | null;
       width?: number | null;
       height?: number | null;
@@ -219,7 +216,6 @@ export interface Media {
       filename?: string | null;
     };
     card?: {
-      _key?: string | null;
       url?: string | null;
       width?: number | null;
       height?: number | null;
@@ -379,6 +375,32 @@ export interface Product {
    */
   dimLength?: string | null;
   /**
+   * Las variantes se gestionan desde la colección Variantes.
+   */
+  variants?: {
+    docs?: (number | Variant)[];
+    hasNextPage?: boolean;
+    totalDocs?: number;
+  };
+  /**
+   * Activa esta opción para crear automáticamente la primera variante de venta al guardar el producto. Se desactiva solo después de crearla. Si ya existe una variante con el mismo SKU, se omite.
+   */
+  createInitialVariant?: boolean | null;
+  /**
+   * Código único. Ej. SIEM-5SL6110-7-PIE. Requerido si activas la creación.
+   */
+  initialVariantSku?: string | null;
+  initialVariantSaleType?: ('piece' | 'box' | 'lot') | null;
+  /**
+   * Para pieza: 1. Para caja o lote: cantidad incluida en el precio.
+   */
+  initialVariantUnitsPerPackage?: number | null;
+  /**
+   * Precio de venta al público. Ej. 299.00
+   */
+  initialVariantPrice?: number | null;
+  initialVariantStock?: number | null;
+  /**
    * Subir en Media (documentType: Imagen de producto) antes de seleccionar aquí.
    */
   images?:
@@ -391,14 +413,6 @@ export interface Product {
    * Subir en Media (documentType: Ficha técnica / Datasheet) antes de seleccionar.
    */
   datasheet?: (number | null) | Media;
-  /**
-   * Las variantes se gestionan desde la colección Variantes.
-   */
-  variants?: {
-    docs?: (number | Variant)[];
-    hasNextPage?: boolean;
-    totalDocs?: number;
-  };
   /**
    * Si se deja vacío, se usa el nombre del producto. Máx. 60 caracteres recomendado.
    */
@@ -424,24 +438,6 @@ export interface Product {
    */
   isDeleted?: boolean | null;
   deletedAt?: string | null;
-  /**
-   * Activa esta opción para crear automáticamente la primera variante de venta al guardar el producto. Se desactiva solo después de crearla. Si ya existe una variante con el mismo SKU, se omite.
-   */
-  createInitialVariant?: boolean | null;
-  /**
-   * Código único. Ej. SIEM-5SL6110-7-PIE. Requerido si activas la creación.
-   */
-  initialVariantSku?: string | null;
-  initialVariantSaleType?: ('piece' | 'box' | 'lot') | null;
-  /**
-   * Para pieza: 1. Para caja o lote: cantidad incluida en el precio.
-   */
-  initialVariantUnitsPerPackage?: number | null;
-  /**
-   * Precio de venta al público. Ej. 299.00
-   */
-  initialVariantPrice?: number | null;
-  initialVariantStock?: number | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -512,17 +508,30 @@ export interface Variant {
  */
 export interface Order {
   id: number;
+  /**
+   * Se genera automáticamente al crear la orden (ej. ORD-000042). Es el identificador que el cliente envía por WhatsApp y el que puedes buscar en este listado.
+   */
+  orderNumber?: string | null;
   customer: {
+    customerName?: string | null;
     customerEmail: string;
     /**
-     * ID del usuario en la tabla `users` de Auth.js. Se vincula en Fase 6 (auth real). No editar manualmente.
+     * ID del usuario en la tabla `users` de Auth.js. No editar manualmente.
      */
     customerAuthId?: string | null;
   };
   /**
-   * Solo cambiar manualmente si Stripe no actualizó el estado vía webhook.
+   * Flujo manual: el cliente inicia la orden por WhatsApp. Solicita el pago, recibe el comprobante y marca «Pago confirmado» (esto descuenta el stock). Marca «Entregada» al completar el envío.
    */
-  status: 'pending' | 'paid' | 'failed' | 'cancelled' | 'fulfilled';
+  status: 'pending' | 'payment_pending' | 'paid' | 'fulfilled' | 'cancelled';
+  shipping?: {
+    name?: string | null;
+    address?: string | null;
+    city?: string | null;
+    state?: string | null;
+    postalCode?: string | null;
+    phone?: string | null;
+  };
   pricing: {
     /**
      * Suma de artículos antes de envío.
@@ -536,18 +545,9 @@ export interface Order {
     taxIncluded?: boolean | null;
   };
   /**
-   * Estos campos son llenados automáticamente por el webhook de Stripe. No editar.
+   * Instrucciones de entrega proporcionadas por el cliente al hacer el pedido.
    */
-  stripe?: {
-    /**
-     * Ej. pi_3Qxxx. Se completa en Fase 6 (integración Stripe).
-     */
-    stripePaymentIntentId?: string | null;
-    /**
-     * Ej. cs_test_xxx. Se completa en Fase 6.
-     */
-    stripeCheckoutSessionId?: string | null;
-  };
+  notes?: string | null;
   /**
    * Notas privadas del equipo sobre esta orden. Nunca visibles para el cliente.
    */
@@ -582,6 +582,10 @@ export interface OrderItem {
    * Copia del SKU al momento de la compra. No editar.
    */
   variantSkuSnapshot: string;
+  /**
+   * Copia de la etiqueta de la variante (ej. «Caja × 10 piezas») al momento de la compra. No editar.
+   */
+  variantLabelSnapshot?: string | null;
   /**
    * Número de unidades compradas de esta variante.
    */
@@ -811,8 +815,6 @@ export interface MediaSelect<T extends boolean = true> {
   documentType?: T;
   isDeleted?: T;
   deletedAt?: T;
-  _key?: T;
-  prefix?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;
@@ -830,7 +832,6 @@ export interface MediaSelect<T extends boolean = true> {
         thumbnail?:
           | T
           | {
-              _key?: T;
               url?: T;
               width?: T;
               height?: T;
@@ -841,7 +842,6 @@ export interface MediaSelect<T extends boolean = true> {
         card?:
           | T
           | {
-              _key?: T;
               url?: T;
               width?: T;
               height?: T;
@@ -904,6 +904,13 @@ export interface ProductsSelect<T extends boolean = true> {
   material?: T;
   dimDiameter?: T;
   dimLength?: T;
+  variants?: T;
+  createInitialVariant?: T;
+  initialVariantSku?: T;
+  initialVariantSaleType?: T;
+  initialVariantUnitsPerPackage?: T;
+  initialVariantPrice?: T;
+  initialVariantStock?: T;
   images?:
     | T
     | {
@@ -911,7 +918,6 @@ export interface ProductsSelect<T extends boolean = true> {
         id?: T;
       };
   datasheet?: T;
-  variants?: T;
   metaTitle?: T;
   metaDescription?: T;
   metaImage?: T;
@@ -919,12 +925,6 @@ export interface ProductsSelect<T extends boolean = true> {
   featured?: T;
   isDeleted?: T;
   deletedAt?: T;
-  createInitialVariant?: T;
-  initialVariantSku?: T;
-  initialVariantSaleType?: T;
-  initialVariantUnitsPerPackage?: T;
-  initialVariantPrice?: T;
-  initialVariantStock?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -953,13 +953,25 @@ export interface VariantsSelect<T extends boolean = true> {
  * via the `definition` "orders_select".
  */
 export interface OrdersSelect<T extends boolean = true> {
+  orderNumber?: T;
   customer?:
     | T
     | {
+        customerName?: T;
         customerEmail?: T;
         customerAuthId?: T;
       };
   status?: T;
+  shipping?:
+    | T
+    | {
+        name?: T;
+        address?: T;
+        city?: T;
+        state?: T;
+        postalCode?: T;
+        phone?: T;
+      };
   pricing?:
     | T
     | {
@@ -968,12 +980,7 @@ export interface OrdersSelect<T extends boolean = true> {
         total?: T;
         taxIncluded?: T;
       };
-  stripe?:
-    | T
-    | {
-        stripePaymentIntentId?: T;
-        stripeCheckoutSessionId?: T;
-      };
+  notes?: T;
   internalNotes?: T;
   items?: T;
   updatedAt?: T;
@@ -989,6 +996,7 @@ export interface OrderItemsSelect<T extends boolean = true> {
   variant?: T;
   productNameSnapshot?: T;
   variantSkuSnapshot?: T;
+  variantLabelSnapshot?: T;
   quantity?: T;
   unitPrice?: T;
   total?: T;
