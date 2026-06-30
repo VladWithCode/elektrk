@@ -288,11 +288,11 @@ export function CheckoutClient({ settings, savedAddresses = [] }: CheckoutClient
         notes: form.notas,
       });
 
-      // Clear cart before redirecting to Stripe (order is saved in Payload).
+      // Clear cart before redirecting (order is saved in Payload).
       clear();
-      // If Stripe is configured, checkoutUrl is the Stripe-hosted checkout page.
-      // If not configured (local dev without keys), it falls back to /checkout/success.
-      window.location.href = result.checkoutUrl;
+      // The success page shows the order number + the "Enviar por WhatsApp"
+      // button that opens the pre-filled message to the store.
+      window.location.href = `/checkout/success?orderId=${encodeURIComponent(result.orderId)}`;
     } catch (err) {
       setSubmitState("error");
       const msg = err instanceof Error ? err.message : "Error al procesar el pedido. Inténtalo de nuevo.";
@@ -504,12 +504,13 @@ export function CheckoutClient({ settings, savedAddresses = [] }: CheckoutClient
               </div>
             )}
 
-            {/* Payment notice */}
-            <div className="flex items-start gap-2.5 rounded-lg border border-blue-500/30 bg-blue-500/5 px-4 py-3 text-sm text-blue-700 dark:text-blue-400">
+            {/* WhatsApp notice */}
+            <div className="flex items-start gap-2.5 rounded-lg border border-green-500/30 bg-green-500/5 px-4 py-3 text-sm text-green-700 dark:text-green-400">
               <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
               <span>
-                Serás redirigido a <strong>Stripe</strong> para completar el pago
-                de forma segura. Tu orden se registra antes del pago.
+                Tu orden se registra y luego te mostramos un botón para
+                <strong> enviar tu pedido por WhatsApp</strong>. Ahí coordinamos
+                el pago (transferencia o en tienda) y la entrega.
               </span>
             </div>
 
@@ -522,12 +523,12 @@ export function CheckoutClient({ settings, savedAddresses = [] }: CheckoutClient
               {submitState === "loading" ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Preparando pago…
+                  Generando pedido…
                 </>
               ) : (
                 <>
                   <CheckCircle2 className="h-4 w-4" />
-                  Continuar al pago
+                  Continuar por WhatsApp
                 </>
               )}
             </Button>
