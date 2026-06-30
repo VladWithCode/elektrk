@@ -9,9 +9,9 @@
  *  - All helpers are pure functions — no side effects at the module level.
  *
  * Usage:
- *  - import { assertStripeConfigured } from "@/lib/env"  → in route handlers
+ *  - import { assertPayloadConfigured } from "@/lib/env"  → in route handlers
  *  - import { warnMissingProductionVars } from "@/lib/env"  → in app startup / instrumentation
- *  - import { isStripeReady, isAuthReady, isPayloadReady } from "@/lib/env"  → boolean guards
+ *  - import { isAuthReady, isPayloadReady } from "@/lib/env"  → boolean guards
  */
 
 // ---------------------------------------------------------------------------
@@ -51,16 +51,6 @@ export function isAuthReady(): boolean {
   return Boolean(process.env.DATABASE_URL);
 }
 
-/** True when the Stripe secret key is configured. */
-export function isStripeReady(): boolean {
-  return Boolean(process.env.STRIPE_SECRET_KEY);
-}
-
-/** True when the Stripe webhook secret is configured. */
-export function isStripeWebhookReady(): boolean {
-  return Boolean(process.env.STRIPE_WEBHOOK_SECRET);
-}
-
 /** True when Google OAuth credentials are present. */
 export function isGoogleAuthReady(): boolean {
   return Boolean(
@@ -90,24 +80,6 @@ export function assertEnv(name: string, docRef?: string): void {
       `[ElektrK] Required environment variable "${name}" is not set.${ref}`
     );
   }
-}
-
-/**
- * Asserts that Stripe is fully configured for checkout creation.
- * Call this inside the /api/checkout/session route handler — never at build time.
- * @throws {Error} if STRIPE_SECRET_KEY is missing.
- */
-export function assertStripeConfigured(): void {
-  assertEnv("STRIPE_SECRET_KEY", "docs/STRIPE_SETUP.md");
-}
-
-/**
- * Asserts that the Stripe webhook secret is set.
- * Call this inside the /api/stripe/webhook route handler.
- * @throws {Error} if STRIPE_WEBHOOK_SECRET is missing.
- */
-export function assertStripeWebhookConfigured(): void {
-  assertEnv("STRIPE_WEBHOOK_SECRET", "docs/STRIPE_SETUP.md");
 }
 
 /**
@@ -160,13 +132,6 @@ export function warnMissingProductionVars(): void {
     if (isProd && !process.env.DATABASE_URL_UNPOOLED) missing.push("DATABASE_URL_UNPOOLED");
   }
 
-  // --- Stripe — warn only, never throw ---
-  const stripeVars: string[] = [];
-  if (!process.env.STRIPE_SECRET_KEY)              stripeVars.push("STRIPE_SECRET_KEY");
-  if (!process.env.STRIPE_WEBHOOK_SECRET)          stripeVars.push("STRIPE_WEBHOOK_SECRET");
-  if (!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
-    stripeVars.push("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY");
-
   // --- OAuth — informational ---
   const oauthWarnings: string[] = [];
   if (!isGoogleAuthReady())   oauthWarnings.push("Google (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET)");
@@ -193,14 +158,6 @@ export function warnMissingProductionVars(): void {
     }
   }
 
-  if (stripeVars.length > 0) {
-    console.info(
-      "[ElektrK] Stripe is not fully configured (payments will be unavailable):\n" +
-        stripeVars.map((v) => `  • ${v}`).join("\n") +
-        "\n  → See docs/STRIPE_SETUP.md to enable real payments."
-    );
-  }
-
   if (oauthWarnings.length > 0 && isProd) {
     console.info(
       "[ElektrK] OAuth providers not configured (social login will be hidden):\n" +
@@ -218,8 +175,6 @@ export interface EnvSummary {
   database: boolean;
   payload: boolean;
   auth: boolean;
-  stripe: boolean;
-  stripeWebhook: boolean;
   googleOAuth: boolean;
   facebookOAuth: boolean;
   serverUrl: string | null;
@@ -236,8 +191,6 @@ export function getEnvSummary(): EnvSummary {
     database: isDatabaseReady(),
     payload: isPayloadReady(),
     auth: isAuthReady(),
-    stripe: isStripeReady(),
-    stripeWebhook: isStripeWebhookReady(),
     googleOAuth: isGoogleAuthReady(),
     facebookOAuth: isFacebookAuthReady(),
     serverUrl: process.env.NEXT_PUBLIC_SERVER_URL ?? null,
