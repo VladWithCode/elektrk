@@ -8,6 +8,7 @@ import { formatCurrency } from "@/lib/currency";
 import { getSessionSafe } from "@/lib/auth/helpers";
 import { getOrderById } from "@/lib/repositories/orders";
 import { ORDER_STATUS_BADGE_VARIANT, ORDER_STATUS_LABELS } from "@/types/order";
+import { formatOrderNumber } from "@/lib/whatsapp/order-message";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -16,7 +17,7 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   return {
-    title: `Orden ${id} — D.E. MTY`,
+    title: `Orden ${formatOrderNumber(id)} — D.E. MTY`,
     robots: { index: false, follow: false },
   };
 }
@@ -54,7 +55,7 @@ export default async function OrderDetailPage({ params }: Props) {
       {/* Header */}
       <div className="flex items-start justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight break-all">{order.id}</h1>
+          <h1 className="text-2xl font-bold tracking-tight break-all">{order.orderNumber}</h1>
           <p className="text-sm text-muted-foreground mt-1">{order.displayDate}</p>
         </div>
         <Badge variant={statusVariant} className="text-sm px-3 py-1 shrink-0">
