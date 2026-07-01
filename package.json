@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "vercel-build": "([ \"$VERCEL_ENV\" != \"production\" ] || bun run payload:migrate) && bun run build",
+    "vercel-build": "bun run payload:migrate && bun run build",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
