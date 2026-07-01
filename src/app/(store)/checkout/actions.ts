@@ -44,6 +44,8 @@ export interface CheckoutSubmitInput {
   shippingPostalCode: string;
   shippingPhone: string;
   notes: string;
+  /** Client-generated UUID (once per checkout mount) to dedupe resubmissions. */
+  idempotencyKey?: string;
 }
 
 export interface CheckoutSubmitResult {
@@ -111,6 +113,7 @@ export async function submitCheckout(
   const { orderId, orderNumber } = await createOrder({
     customerAuthId: session.user.id,
     customerEmail: session.user.email,
+    idempotencyKey: input.idempotencyKey,
     items: input.items.map((item) => ({
       ...item,
       // Persist authoritative price in the order item, not client price

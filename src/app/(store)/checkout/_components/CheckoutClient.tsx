@@ -94,6 +94,14 @@ const ESTADOS_MX = [
   "Veracruz", "Yucatán", "Zacatecas",
 ];
 
+/** Stable-per-mount key so a double-submit / retry can't create two orders. */
+function makeIdempotencyKey(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -127,6 +135,9 @@ export function CheckoutClient({ settings, savedAddresses = [] }: CheckoutClient
   });
   const [submitState, setSubmitState] = useState<"idle" | "loading" | "error">("idle");
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // Generated once per checkout mount; reused across retries so the server
+  // dedupes resubmissions into a single order (§2.4).
+  const [idempotencyKey] = useState(makeIdempotencyKey);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof CheckoutForm, string>>>({});
 
   // Prefill contact fields from session when it becomes available.
@@ -260,6 +271,9 @@ export function CheckoutClient({ settings, savedAddresses = [] }: CheckoutClient
     e.preventDefault();
     setSubmitError(null);
 
+    // Guard against re-entry (double click / Enter) while a submit is in flight.
+    if (submitState === "loading") return;
+
     if (!validateForm()) return;
     if (!cartIsValid) {
       setSubmitError("Hay problemas con los artículos en tu carrito. Revísalos antes de continuar.");
@@ -286,6 +300,7 @@ export function CheckoutClient({ settings, savedAddresses = [] }: CheckoutClient
         shippingPostalCode: form.codigoPostal,
         shippingPhone: form.telefono,
         notes: form.notas,
+        idempotencyKey,
       });
 
       // Clear cart before redirecting (order is saved in Payload).

@@ -92,6 +92,14 @@ interface RawPayloadSettings {
     announcementEnabled?: boolean | null;
     announcementBanner?: string | null;
   } | null;
+  payment?: {
+    bankName?: string | null;
+    accountHolder?: string | null;
+    clabe?: string | null;
+    accountNumber?: string | null;
+    paymentInstructions?: string | null;
+    pendingOrderTtlDays?: number | null;
+  } | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -118,6 +126,20 @@ function mapPayloadSettings(raw: RawPayloadSettings): StorefrontSettings {
       raw.announcement?.announcementEnabled ?? MOCK_SETTINGS.announcementEnabled ?? false,
     announcementBanner:
       raw.announcement?.announcementBanner ?? MOCK_SETTINGS.announcementBanner ?? null,
+    payment: {
+      bankName: raw.payment?.bankName ?? MOCK_SETTINGS.payment.bankName,
+      accountHolder:
+        raw.payment?.accountHolder ?? MOCK_SETTINGS.payment.accountHolder,
+      clabe: raw.payment?.clabe ?? MOCK_SETTINGS.payment.clabe,
+      accountNumber:
+        raw.payment?.accountNumber ?? MOCK_SETTINGS.payment.accountNumber,
+      paymentInstructions:
+        raw.payment?.paymentInstructions ??
+        MOCK_SETTINGS.payment.paymentInstructions,
+      pendingOrderTtlDays:
+        raw.payment?.pendingOrderTtlDays ??
+        MOCK_SETTINGS.payment.pendingOrderTtlDays,
+    },
   };
 }
 

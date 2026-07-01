@@ -16,6 +16,7 @@
 // Orders collection, which the Payload CLI loads under plain Node ESM where the
 // "@/" path alias is not resolved. Keep every import in this chain relative.
 import { formatCurrency } from "../currency";
+import { formatPaymentLines, type PaymentDetails } from "../payments/format";
 
 // ---------------------------------------------------------------------------
 // Order number
@@ -66,6 +67,8 @@ export interface WhatsAppOrderMessageInput {
   total: number;
   currency: string;
   notes?: string | null;
+  /** Store bank details — appended as a "Datos de pago" block when present. */
+  payment?: PaymentDetails | null;
 }
 
 /**
@@ -110,6 +113,12 @@ export function buildOrderWhatsAppMessage(input: WhatsAppOrderMessageInput): str
     `Envío: ${formatCurrency(input.shipping)}`,
     `Total: ${formatCurrency(input.total)} ${input.currency}`
   );
+
+  // Payment details (bank / instructions)
+  const paymentLines = formatPaymentLines(input.payment);
+  if (paymentLines.length > 0) {
+    lines.push("", "Datos de pago:", ...paymentLines);
+  }
 
   // Notes
   if (input.notes && input.notes.trim().length > 0) {
