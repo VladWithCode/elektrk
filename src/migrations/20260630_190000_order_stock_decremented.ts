@@ -10,19 +10,14 @@ import { MigrateUpArgs, MigrateDownArgs, sql } from '@payloadcms/db-postgres'
  * (and decrements stock) and false when a paid order is cancelled (restoring
  * stock), so stock is never double-counted across manual status toggles.
  *
- * Also runs the operational order-number backfill (§9) — idempotent, only
- * touches rows whose order_number is still null.
+ * NOTE: the §9 order_number backfill is intentionally NOT here — it is an
+ * operator-run, one-off step (20260630_whatsapp_orders already backfills that
+ * column on apply). Keeping it out avoids a hard dependency on order_number.
  */
 
 export async function up({ db }: MigrateUpArgs): Promise<void> {
   await db.execute(sql`
     ALTER TABLE "orders" ADD COLUMN "stock_decremented" boolean DEFAULT false;
-  `)
-
-  await db.execute(sql`
-    UPDATE "orders"
-    SET "order_number" = 'ORD-' || lpad("id"::text, 6, '0')
-    WHERE "order_number" IS NULL;
   `)
 }
 
