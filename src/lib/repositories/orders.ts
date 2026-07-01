@@ -24,6 +24,8 @@ import type {
   CreateOrderResult,
 } from "@/types/order";
 import { formatOrderNumber } from "@/lib/whatsapp/order-message";
+import type { StatusHistoryActor } from "@/lib/orders/status-history";
+import { sendOrderCreatedEmails } from "@/lib/email/order-emails";
 import {
   getMockOrdersByCustomer,
   getMockRecentOrders,
@@ -203,35 +205,61 @@ export async function createOrder(
 
   const payload = await getPayloadClient();
 
+  // --- 0. Idempotency: return the existing order for a repeated submit ---
+  if (input.idempotencyKey) {
+    const existing = await _findOrderByIdempotencyKey(
+      payload,
+      input.idempotencyKey,
+      input.customerAuthId
+    );
+    if (existing) return existing;
+  }
+
   // --- 1. Create the parent Order ---
   // The Orders afterChange hook backfills `orderNumber` from the serial id.
-  const order = await payload.create({
-    collection: "orders",
-    overrideAccess: true,
-    data: {
-      status: "pending",
-      customer: {
-        customerName: input.shippingName,
-        customerAuthId: input.customerAuthId,
-        customerEmail: input.customerEmail,
+  let order;
+  try {
+    order = await payload.create({
+      collection: "orders",
+      overrideAccess: true,
+      data: {
+        status: "pending",
+        idempotencyKey: input.idempotencyKey || null,
+        customer: {
+          customerName: input.shippingName,
+          customerAuthId: input.customerAuthId,
+          customerEmail: input.customerEmail,
+        },
+        shipping: {
+          name: input.shippingName,
+          address: input.shippingAddress,
+          city: input.shippingCity,
+          state: input.shippingState,
+          postalCode: input.shippingPostalCode,
+          phone: input.shippingPhone || null,
+        },
+        pricing: {
+          subtotal: input.subtotal,
+          shipping: input.shipping,
+          total: input.total,
+          taxIncluded: true,
+        },
+        notes: input.notes || null,
       },
-      shipping: {
-        name: input.shippingName,
-        address: input.shippingAddress,
-        city: input.shippingCity,
-        state: input.shippingState,
-        postalCode: input.shippingPostalCode,
-        phone: input.shippingPhone || null,
-      },
-      pricing: {
-        subtotal: input.subtotal,
-        shipping: input.shipping,
-        total: input.total,
-        taxIncluded: true,
-      },
-      notes: input.notes || null,
-    },
-  });
+    });
+  } catch (err) {
+    // A concurrent submit with the same key may have inserted first, tripping
+    // the unique index. Recover by returning that order instead of failing.
+    if (input.idempotencyKey) {
+      const existing = await _findOrderByIdempotencyKey(
+        payload,
+        input.idempotencyKey,
+        input.customerAuthId
+      );
+      if (existing) return existing;
+    }
+    throw err;
+  }
 
   const orderId: string = order.id as string;
 
@@ -268,7 +296,49 @@ export async function createOrder(
     })
   );
 
+  // Fire the order-received (customer) + new-order (admin) emails now that the
+  // order-items exist, so the templates include the full line-item list.
+  // Best-effort: sendOrderCreatedEmails swallows its own failures.
+  try {
+    await sendOrderCreatedEmails(payload, orderId);
+  } catch {
+    // never block order creation on email
+  }
+
   return { orderId, orderNumber: formatOrderNumber(orderId) };
+}
+
+/**
+ * Looks up an order by its idempotency key, scoped to the same customer, and
+ * returns it in CreateOrderResult shape. Null when none exists.
+ */
+async function _findOrderByIdempotencyKey(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  payload: any,
+  idempotencyKey: string,
+  customerAuthId: string
+): Promise<CreateOrderResult | null> {
+  const result = await payload.find({
+    collection: "orders",
+    where: {
+      and: [
+        { idempotencyKey: { equals: idempotencyKey } },
+        { "customer.customerAuthId": { equals: customerAuthId } },
+      ],
+    },
+    limit: 1,
+    depth: 0,
+    overrideAccess: true,
+  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const doc = (result.docs as any[])[0];
+  if (!doc) return null;
+  return {
+    orderId: String(doc.id),
+    orderNumber:
+      (typeof doc.orderNumber === "string" && doc.orderNumber) ||
+      formatOrderNumber(doc.id),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -282,7 +352,7 @@ export async function getOrderFilters(): Promise<{
     statuses: [
       { value: "all",             label: "Todas"           },
       { value: "pending",         label: "Recibida"        },
-      { value: "payment_pending", label: "Pago solicitado" },
+      { value: "payment_pending", label: "Pago en revisión" },
       { value: "paid",            label: "Pago confirmado"  },
       { value: "fulfilled",       label: "Entregada"        },
       { value: "cancelled",       label: "Cancelada"        },
@@ -363,12 +433,16 @@ async function _payloadGetRecentOrders(
 /**
  * Updates only the status field of an Order.
  *
- * Stock is decremented automatically by the Orders collection afterChange hook
- * when the status transitions to "paid" — callers do not handle stock here.
+ * Stock is decremented/restored automatically by the Orders collection
+ * afterChange hook on transitions into "paid"/"cancelled" — callers do not
+ * handle stock here. The `actor` is forwarded via `context.statusActor` so the
+ * hook attributes the resulting statusHistory entry correctly (defaults to
+ * "admin" for edits made directly in the Payload admin UI).
  */
 export async function updateOrderStatus(
   orderId: string,
-  status: "pending" | "payment_pending" | "paid" | "fulfilled" | "cancelled"
+  status: "pending" | "payment_pending" | "paid" | "fulfilled" | "cancelled",
+  options?: { actor?: StatusHistoryActor; note?: string | null }
 ): Promise<void> {
   if (dataSource() !== "payload") return;
   const payload = await getPayloadClient();
@@ -377,7 +451,259 @@ export async function updateOrderStatus(
     id: orderId,
     overrideAccess: true,
     data: { status },
+    context: {
+      statusActor: options?.actor ?? "admin",
+      ...(options?.note ? { statusNote: options.note } : {}),
+    },
   });
+}
+
+// ---------------------------------------------------------------------------
+// Payment proofs
+// ---------------------------------------------------------------------------
+
+export interface PaymentProofFile {
+  buffer: Buffer;
+  mimetype: string;
+  filename: string;
+  size: number;
+}
+
+/**
+ * Uploads a payment-proof file to Media and appends it to the order's
+ * `paymentProofs` array. When the order is still "pending", it is advanced to
+ * "payment_pending" (a "proof submitted, awaiting review" signal). The admin
+ * still decides "paid" manually.
+ *
+ * Access is overridden because Orders/Media writes are admin-only; the caller
+ * (server action) is responsible for auth + ownership + status checks.
+ */
+export async function attachPaymentProof(
+  orderId: string,
+  file: PaymentProofFile,
+  uploadedBy: "customer" | "admin"
+): Promise<void> {
+  if (dataSource() !== "payload") {
+    throw new Error("La carga de comprobantes requiere DATA_SOURCE=payload.");
+  }
+
+  const payload = await getPayloadClient();
+
+  // 1. Upload the file to Media (uploadthing storage).
+  const media = await payload.create({
+    collection: "media",
+    overrideAccess: true,
+    data: {
+      documentType: "document",
+      alt: `Comprobante de pago — ${file.filename}`,
+    },
+    file: {
+      data: file.buffer,
+      mimetype: file.mimetype,
+      name: file.filename,
+      size: file.size,
+    },
+  });
+
+  // 2. Read the existing proofs + status (depth 0 → file is the media id).
+  const order = await payload.findByID({
+    collection: "orders",
+    id: orderId,
+    depth: 0,
+    overrideAccess: true,
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const existing: any[] = Array.isArray(order?.paymentProofs)
+    ? order.paymentProofs
+    : [];
+  const normalizedExisting = existing.map((p) => ({
+    id: p.id,
+    file: p.file && typeof p.file === "object" ? p.file.id : p.file,
+    uploadedBy: p.uploadedBy ?? "admin",
+    uploadedAt: p.uploadedAt ?? null,
+    reviewStatus: p.reviewStatus ?? "pending",
+    reviewNote: p.reviewNote ?? null,
+  }));
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data: Record<string, any> = {
+    paymentProofs: [
+      ...normalizedExisting,
+      {
+        file: media.id,
+        uploadedBy,
+        uploadedAt: new Date().toISOString(),
+        reviewStatus: "pending",
+        reviewNote: null,
+      },
+    ],
+  };
+
+  // 3. Auto-advance the status on the first move out of "pending".
+  const advancing = order?.status === "pending";
+  if (advancing) {
+    data.status = "payment_pending";
+  }
+
+  await payload.update({
+    collection: "orders",
+    id: orderId,
+    overrideAccess: true,
+    data,
+    // Attribute the resulting statusHistory entry to the uploader. Only the
+    // customer path advances the status; admin uploads don't change it.
+    context:
+      advancing && uploadedBy === "customer"
+        ? { statusActor: "customer", statusNote: "Comprobante subido" }
+        : undefined,
+  });
+}
+
+/**
+ * Records that the customer re-opened the WhatsApp hand-off from their order
+ * page (§7.1). No status change — skips the order hooks entirely.
+ */
+export async function markWhatsAppSent(orderId: string): Promise<void> {
+  if (dataSource() !== "payload") return;
+  const payload = await getPayloadClient();
+  await payload.update({
+    collection: "orders",
+    id: orderId,
+    overrideAccess: true,
+    context: { skipOrderHooks: true },
+    data: { whatsappSentAt: new Date().toISOString() },
+  });
+}
+
+/**
+ * Removes a payment proof from an order and deletes its underlying media doc.
+ *
+ * Caller (server action) must enforce ownership + that the proof is still
+ * removable (customer-uploaded, reviewStatus === "pending"). This just performs
+ * the mutation. No-op when the proof id is not found.
+ */
+export async function removePaymentProof(
+  orderId: string,
+  proofId: string
+): Promise<void> {
+  if (dataSource() !== "payload") {
+    throw new Error("La gestión de comprobantes requiere DATA_SOURCE=payload.");
+  }
+
+  const payload = await getPayloadClient();
+  const order = await payload.findByID({
+    collection: "orders",
+    id: orderId,
+    depth: 0,
+    overrideAccess: true,
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const existing: any[] = Array.isArray(order?.paymentProofs)
+    ? order.paymentProofs
+    : [];
+  const target = existing.find((p) => String(p.id) === String(proofId));
+  if (!target) return;
+
+  const mediaId =
+    target.file && typeof target.file === "object" ? target.file.id : target.file;
+
+  const remaining = existing
+    .filter((p) => String(p.id) !== String(proofId))
+    .map((p) => ({
+      id: p.id,
+      file: p.file && typeof p.file === "object" ? p.file.id : p.file,
+      uploadedBy: p.uploadedBy ?? "admin",
+      uploadedAt: p.uploadedAt ?? null,
+      reviewStatus: p.reviewStatus ?? "pending",
+      reviewNote: p.reviewNote ?? null,
+    }));
+
+  await payload.update({
+    collection: "orders",
+    id: orderId,
+    overrideAccess: true,
+    context: { skipOrderHooks: true },
+    data: { paymentProofs: remaining },
+  });
+
+  // Delete the now-orphaned media (best-effort — the array row is already gone).
+  if (mediaId) {
+    try {
+      await payload.delete({
+        collection: "media",
+        id: mediaId,
+        overrideAccess: true,
+      });
+    } catch (err) {
+      console.error("[removePaymentProof] media delete failed:", err);
+    }
+  }
+}
+
+/**
+ * Auto-expires stale unpaid orders (§4.2). Cancels `pending` orders — and
+ * `payment_pending` orders with no accepted proof — created before the TTL
+ * cutoff. Cancelling never touches stock (it was never decremented) and, via
+ * updateOrderStatus → the afterChange hook, appends a statusHistory entry with
+ * changedBy "system" (and sends the cancellation email).
+ *
+ * Returns the ids that were cancelled.
+ */
+export async function expireStalePendingOrders(
+  ttlDays: number
+): Promise<{ cancelled: number; orderIds: string[] }> {
+  if (dataSource() !== "payload") return { cancelled: 0, orderIds: [] };
+  const days = Number.isFinite(ttlDays) && ttlDays > 0 ? ttlDays : 7;
+
+  const payload = await getPayloadClient();
+  const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+  const result = await payload.find({
+    collection: "orders",
+    where: {
+      and: [
+        { createdAt: { less_than: cutoff } },
+        {
+          or: [
+            { status: { equals: "pending" } },
+            { status: { equals: "payment_pending" } },
+          ],
+        },
+      ],
+    },
+    limit: 200,
+    depth: 0,
+    overrideAccess: true,
+  });
+
+  const orderIds: string[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const doc of result.docs as any[]) {
+    // A payment_pending order with an accepted proof is effectively paid-in-fact
+    // pending the admin's confirmation — never auto-cancel it.
+    if (doc.status === "payment_pending") {
+      const proofs = Array.isArray(doc.paymentProofs) ? doc.paymentProofs : [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const hasAccepted = proofs.some((p: any) => p?.reviewStatus === "accepted");
+      if (hasAccepted) continue;
+    }
+    try {
+      await updateOrderStatus(String(doc.id), "cancelled", {
+        actor: "system",
+        note: "Cancelada automáticamente por falta de pago.",
+      });
+      orderIds.push(String(doc.id));
+    } catch (err) {
+      payload.logger?.error?.(
+        `[expireStalePendingOrders] Failed to cancel order ${doc.id}: ` +
+          (err instanceof Error ? err.message : String(err))
+      );
+    }
+  }
+
+  return { cancelled: orderIds.length, orderIds };
 }
 
 // Re-export mapper types for callers that receive raw Payload docs

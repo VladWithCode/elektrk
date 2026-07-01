@@ -31,6 +31,10 @@ import type {
   OrderItemSummary,
   OrderStatus,
   ShippingAddress,
+  PaymentProof,
+  PaymentProofUploader,
+  PaymentProofReviewStatus,
+  OrderStatusChange,
 } from "@/types/order";
 import { isValidOrderStatus, ORDER_STATUS_LABELS } from "@/types/order";
 import { formatOrderNumber } from "@/lib/whatsapp/order-message";
@@ -85,6 +89,12 @@ export interface RawPayloadOrder {
 
   /** Buyer-facing delivery notes. */
   notes?: unknown;
+
+  /** paymentProofs array: [{ id, file: media, uploadedBy, uploadedAt }] */
+  paymentProofs?: unknown;
+
+  /** statusHistory array: [{ status, changedAt, changedBy, note }] */
+  statusHistory?: unknown;
 
   /**
    * Populated join — Payload v3 join fields return { docs: [...], hasNextPage: bool }
@@ -146,9 +156,108 @@ export function mapPayloadOrder(raw: RawPayloadOrder): OrderDetail {
     customerEmail: str(raw.customer?.customerEmail) ?? "",
     customerAuthId: str(raw.customer?.customerAuthId) ?? "",
     items,
+    paymentProofs: mapPaymentProofs(raw.paymentProofs),
+    statusHistory: mapStatusHistory(raw.statusHistory),
     shippingAddress,
     notes: str(raw.notes),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Status history
+// ---------------------------------------------------------------------------
+
+function mapStatusHistory(value: unknown): OrderStatusChange[] {
+  if (!Array.isArray(value)) return [];
+  const entries: OrderStatusChange[] = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== "object") continue;
+    const row = raw as {
+      status?: unknown;
+      changedAt?: unknown;
+      changedBy?: unknown;
+      note?: unknown;
+    };
+    entries.push({
+      status: isValidOrderStatus(row.status) ? row.status : "pending",
+      changedAt: str(row.changedAt),
+      changedBy: str(row.changedBy) ?? "system",
+      note: str(row.note),
+    });
+  }
+  // Oldest → newest (rows are appended chronologically, but sort defensively).
+  entries.sort((a, b) => {
+    const ta = a.changedAt ? new Date(a.changedAt).getTime() : 0;
+    const tb = b.changedAt ? new Date(b.changedAt).getTime() : 0;
+    return ta - tb;
+  });
+  return entries;
+}
+
+// ---------------------------------------------------------------------------
+// Payment proofs
+// ---------------------------------------------------------------------------
+
+const UPLOADTHING_PUBLIC_BASE = "https://utfs.io/f/";
+
+interface RawMediaRef {
+  id?: unknown;
+  _key?: unknown;
+  filename?: unknown;
+  mimeType?: unknown;
+  url?: unknown;
+  sizes?: Record<string, { _key?: unknown } | null> | null;
+}
+
+/** Resolves the public URL for a media doc (uploadthing key first, else url). */
+function resolveProofUrl(file: RawMediaRef): string | null {
+  if (typeof file._key === "string" && file._key) {
+    return UPLOADTHING_PUBLIC_BASE + file._key;
+  }
+  const sizes = file.sizes;
+  if (sizes) {
+    for (const s of Object.values(sizes)) {
+      if (s && typeof s._key === "string" && s._key) {
+        return UPLOADTHING_PUBLIC_BASE + s._key;
+      }
+    }
+  }
+  return str(file.url);
+}
+
+function mapPaymentProofs(value: unknown): PaymentProof[] {
+  if (!Array.isArray(value)) return [];
+  const proofs: PaymentProof[] = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== "object") continue;
+    const row = raw as {
+      id?: unknown;
+      file?: unknown;
+      uploadedBy?: unknown;
+      uploadedAt?: unknown;
+      reviewStatus?: unknown;
+      reviewNote?: unknown;
+    };
+    // `file` is the populated media doc at depth ≥ 2; skip if not populated.
+    if (!row.file || typeof row.file !== "object") continue;
+    const file = row.file as RawMediaRef;
+    const mimeType = str(file.mimeType) ?? "";
+    const reviewStatus: PaymentProofReviewStatus =
+      row.reviewStatus === "accepted" || row.reviewStatus === "rejected"
+        ? row.reviewStatus
+        : "pending";
+    proofs.push({
+      id: str(row.id) ?? String(file.id ?? ""),
+      url: resolveProofUrl(file),
+      filename: str(file.filename) ?? "comprobante",
+      isImage: mimeType.startsWith("image/"),
+      uploadedBy: (row.uploadedBy === "customer" ? "customer" : "admin") as PaymentProofUploader,
+      uploadedAt: str(row.uploadedAt),
+      reviewStatus,
+      reviewNote: str(row.reviewNote),
+    });
+  }
+  return proofs;
 }
 
 /**

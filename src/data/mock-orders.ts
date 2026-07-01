@@ -21,6 +21,11 @@ export const MOCK_ORDER_DETAILS: OrderDetail[] = [
   {
     id: "ORD-001",
     orderNumber: "ORD-000001",
+    statusHistory: [
+      { status: "pending", changedAt: "2024-05-10T14:30:00.000Z", changedBy: "customer", note: "Orden creada" },
+      { status: "paid", changedAt: "2024-05-11T10:00:00.000Z", changedBy: "admin", note: null },
+      { status: "fulfilled", changedAt: "2024-05-12T09:00:00.000Z", changedBy: "admin", note: null },
+    ],
     createdAt: "2024-05-10T14:30:00.000Z",
     displayDate: "10 may. 2024",
     status: "fulfilled",
@@ -30,6 +35,7 @@ export const MOCK_ORDER_DETAILS: OrderDetail[] = [
     itemCount: 2,
     customerEmail: MOCK_CUSTOMER_EMAIL,
     customerAuthId: MOCK_CUSTOMER_AUTH_ID,
+    paymentProofs: [],
     notes: null,
     shippingAddress: {
       name: "Juan Pérez",
@@ -67,6 +73,11 @@ export const MOCK_ORDER_DETAILS: OrderDetail[] = [
   {
     id: "ORD-002",
     orderNumber: "ORD-000002",
+    statusHistory: [
+      { status: "pending", changedAt: "2024-06-01T09:15:00.000Z", changedBy: "customer", note: "Orden creada" },
+      { status: "payment_pending", changedAt: "2024-06-01T18:40:00.000Z", changedBy: "customer", note: "Comprobante subido" },
+      { status: "paid", changedAt: "2024-06-02T11:05:00.000Z", changedBy: "admin", note: null },
+    ],
     createdAt: "2024-06-01T09:15:00.000Z",
     displayDate: "1 jun. 2024",
     status: "paid",
@@ -76,6 +87,7 @@ export const MOCK_ORDER_DETAILS: OrderDetail[] = [
     itemCount: 1,
     customerEmail: MOCK_CUSTOMER_EMAIL,
     customerAuthId: MOCK_CUSTOMER_AUTH_ID,
+    paymentProofs: [],
     notes: null,
     shippingAddress: {
       name: "Juan Pérez",
@@ -102,6 +114,10 @@ export const MOCK_ORDER_DETAILS: OrderDetail[] = [
   {
     id: "ORD-003",
     orderNumber: "ORD-000003",
+    statusHistory: [
+      { status: "pending", changedAt: "2024-04-20T16:00:00.000Z", changedBy: "customer", note: "Orden creada" },
+      { status: "cancelled", changedAt: "2024-04-21T08:30:00.000Z", changedBy: "customer", note: "Cancelado por el cliente antes del envío." },
+    ],
     createdAt: "2024-04-20T16:00:00.000Z",
     displayDate: "20 abr. 2024",
     status: "cancelled",
@@ -111,6 +127,7 @@ export const MOCK_ORDER_DETAILS: OrderDetail[] = [
     itemCount: 1,
     customerEmail: MOCK_CUSTOMER_EMAIL,
     customerAuthId: MOCK_CUSTOMER_AUTH_ID,
+    paymentProofs: [],
     notes: "Cancelado por el cliente antes del envío.",
     shippingAddress: null,
     items: [

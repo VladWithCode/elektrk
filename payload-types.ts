@@ -512,6 +512,10 @@ export interface Order {
    * Se genera automáticamente al crear la orden (ej. ORD-000042). Es el identificador que el cliente envía por WhatsApp y el que puedes buscar en este listado.
    */
   orderNumber?: string | null;
+  /**
+   * Evita órdenes duplicadas si el checkout se reenvía. Se genera en el cliente. No editar manualmente.
+   */
+  idempotencyKey?: string | null;
   customer: {
     customerName?: string | null;
     customerEmail: string;
@@ -524,6 +528,14 @@ export interface Order {
    * Flujo manual: el cliente inicia la orden por WhatsApp. Solicita el pago, recibe el comprobante y marca «Pago confirmado» (esto descuenta el stock). Marca «Entregada» al completar el envío.
    */
   status: 'pending' | 'payment_pending' | 'paid' | 'fulfilled' | 'cancelled';
+  /**
+   * Indica si el inventario ya se descontó por esta orden. Se administra automáticamente: se descuenta al confirmar el pago y se restaura si la orden se cancela. No editar manualmente.
+   */
+  stockDecremented?: boolean | null;
+  /**
+   * Fecha en que el cliente abrió el mensaje de WhatsApp desde su orden. Sirve para saber si ya inició contacto. Se registra automáticamente.
+   */
+  whatsappSentAt?: string | null;
   shipping?: {
     name?: string | null;
     address?: string | null;
@@ -544,6 +556,40 @@ export interface Order {
     total: number;
     taxIncluded?: boolean | null;
   };
+  /**
+   * Comprobantes de transferencia o pago (imagen o PDF). Los sube el cliente desde el detalle de su orden, o el administrador si los recibió por otro medio (WhatsApp, correo, etc.). Revísalos antes de confirmar el pago.
+   */
+  paymentProofs?:
+    | {
+        file: number | Media;
+        uploadedBy?: ('customer' | 'admin') | null;
+        uploadedAt?: string | null;
+        /**
+         * Revisa cada comprobante. «Aceptado» no confirma el pago por sí solo (usa el estado de la orden para eso); «Rechazado» notifica al cliente.
+         */
+        reviewStatus?: ('pending' | 'accepted' | 'rejected') | null;
+        /**
+         * Motivo visible para el cliente (ej. «el monto no coincide»). Se incluye en el correo al rechazar.
+         */
+        reviewNote?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * Registro automático de cada cambio de estado (quién, cuándo y por qué). Solo lectura.
+   */
+  statusHistory?:
+    | {
+        status?: ('pending' | 'payment_pending' | 'paid' | 'fulfilled' | 'cancelled') | null;
+        changedAt?: string | null;
+        /**
+         * "customer", "admin" o "system".
+         */
+        changedBy?: string | null;
+        note?: string | null;
+        id?: string | null;
+      }[]
+    | null;
   /**
    * Instrucciones de entrega proporcionadas por el cliente al hacer el pedido.
    */
@@ -954,6 +1000,7 @@ export interface VariantsSelect<T extends boolean = true> {
  */
 export interface OrdersSelect<T extends boolean = true> {
   orderNumber?: T;
+  idempotencyKey?: T;
   customer?:
     | T
     | {
@@ -962,6 +1009,8 @@ export interface OrdersSelect<T extends boolean = true> {
         customerAuthId?: T;
       };
   status?: T;
+  stockDecremented?: T;
+  whatsappSentAt?: T;
   shipping?:
     | T
     | {
@@ -979,6 +1028,25 @@ export interface OrdersSelect<T extends boolean = true> {
         shipping?: T;
         total?: T;
         taxIncluded?: T;
+      };
+  paymentProofs?:
+    | T
+    | {
+        file?: T;
+        uploadedBy?: T;
+        uploadedAt?: T;
+        reviewStatus?: T;
+        reviewNote?: T;
+        id?: T;
+      };
+  statusHistory?:
+    | T
+    | {
+        status?: T;
+        changedAt?: T;
+        changedBy?: T;
+        note?: T;
+        id?: T;
       };
   notes?: T;
   internalNotes?: T;
@@ -1131,6 +1199,32 @@ export interface Setting {
     taxIncludedByDefault?: boolean | null;
   };
   /**
+   * Datos bancarios e instrucciones de pago. Se muestran al cliente en su orden, en el mensaje de WhatsApp y en el correo de confirmación.
+   */
+  payment?: {
+    /**
+     * Ej. BBVA, Santander.
+     */
+    bankName?: string | null;
+    accountHolder?: string | null;
+    /**
+     * 18 dígitos. Es el dato principal para transferencias.
+     */
+    clabe?: string | null;
+    /**
+     * Opcional.
+     */
+    accountNumber?: string | null;
+    /**
+     * Texto libre. Ej. «Envía tu comprobante por WhatsApp o desde tu orden».
+     */
+    paymentInstructions?: string | null;
+    /**
+     * Opcional. Las órdenes pendientes sin pago se cancelan automáticamente después de estos días (deja vacío para usar el valor por defecto, 7).
+     */
+    pendingOrderTtlDays?: number | null;
+  };
+  /**
    * Banner informativo opcional que aparece en la parte superior del storefront.
    */
   announcement?: {
@@ -1163,6 +1257,16 @@ export interface SettingsSelect<T extends boolean = true> {
         flatShippingRate?: T;
         currency?: T;
         taxIncludedByDefault?: T;
+      };
+  payment?:
+    | T
+    | {
+        bankName?: T;
+        accountHolder?: T;
+        clabe?: T;
+        accountNumber?: T;
+        paymentInstructions?: T;
+        pendingOrderTtlDays?: T;
       };
   announcement?:
     | T

@@ -9,6 +9,17 @@
  * to the StorefrontSettings interface below.
  */
 
+/** Bank details + payment instructions surfaced to the customer. */
+export interface PaymentSettings {
+  bankName: string | null;
+  accountHolder: string | null;
+  clabe: string | null;
+  accountNumber: string | null;
+  paymentInstructions: string | null;
+  /** Days after which unpaid pending orders auto-expire (null → use default). */
+  pendingOrderTtlDays: number | null;
+}
+
 export interface StorefrontSettings {
   storeName: string;
   supportEmail: string;
@@ -19,6 +30,7 @@ export interface StorefrontSettings {
   taxIncludedByDefault: boolean;
   announcementEnabled?: boolean;
   announcementBanner?: string | null;
+  payment: PaymentSettings;
 }
 
 export const MOCK_SETTINGS: StorefrontSettings = {
@@ -31,4 +43,13 @@ export const MOCK_SETTINGS: StorefrontSettings = {
   taxIncludedByDefault: true,
   announcementEnabled: false,
   announcementBanner: null,
+  // Empty by default so nothing fake renders until the admin fills these in.
+  payment: {
+    bankName: null,
+    accountHolder: null,
+    clabe: null,
+    accountNumber: null,
+    paymentInstructions: null,
+    pendingOrderTtlDays: null,
+  },
 };
