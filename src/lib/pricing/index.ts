@@ -1,13 +1,10 @@
 /**
  * Pricing engine — ElektrK
  *
- * Pure functions: no side effects, no DB calls, no Stripe.
+ * Pure functions: no side effects, no DB calls.
  * Works with CartItem[] from CartContext and StorefrontSettings from mock or Payload.
- *
- * TODO (Phase 7B — Stripe integration):
- *   - Pass OrderTotals to Stripe Checkout Session as line_items + shipping_rate
- *   - Convert MXN amounts to centavos (amount * 100) for Stripe API
- *   - Use validateCartItems + validateCartStock before creating PaymentIntent
+ * The checkout server action uses these totals to create the Order before the
+ * buyer sends the WhatsApp message.
  */
 
 import type { CartItem } from "@/types/product";
@@ -67,8 +64,6 @@ export function calculateSubtotal(items: CartItem[]): number {
 /**
  * Returns the flat shipping rate from storefront settings.
  * Future: could return 0 for orders above a free-shipping threshold.
- *
- * TODO (Phase 7B): replace with Stripe shipping_rate or real carrier rate.
  */
 export function calculateShipping(
   settings: Pick<StorefrontSettings, "flatShippingRate">
@@ -180,9 +175,9 @@ export function validateCartItems(items: CartItem[]): CartValidationError[] {
  * Validates that requested quantities don't exceed available stock.
  * Uses the `stock` field stored in each CartItem (snapshot at add-to-cart time).
  *
- * TODO (Phase 7B — before creating Stripe session):
- *   Re-validate against live stock from Payload/DB to prevent overselling.
- *   CartItem.stock is a client-side snapshot and may be stale.
+ * Note: this is the client-side snapshot check. The checkout server action
+ * re-validates against live stock from Payload (validateCartAgainstInventory)
+ * before creating the order to prevent overselling.
  */
 export function validateCartStock(items: CartItem[]): CartValidationError[] {
   const errors: CartValidationError[] = [];

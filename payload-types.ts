@@ -187,8 +187,14 @@ export interface Media {
    * Usado por el filtro de relaciones en Productos para mostrar solo el tipo correcto en cada campo (imágenes → image, ficha técnica → datasheet, meta → og-image).
    */
   documentType: 'image' | 'datasheet' | 'og-image' | 'document';
-  _key?: string | null;
-  prefix?: string | null;
+  /**
+   * Marcado como eliminado. El archivo se oculta del storefront pero se conserva en la base de datos.
+   */
+  isDeleted?: boolean | null;
+  /**
+   * Fecha y hora en que se marcó como eliminado.
+   */
+  deletedAt?: string | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -202,7 +208,6 @@ export interface Media {
   focalY?: number | null;
   sizes?: {
     thumbnail?: {
-      _key?: string | null;
       url?: string | null;
       width?: number | null;
       height?: number | null;
@@ -211,7 +216,6 @@ export interface Media {
       filename?: string | null;
     };
     card?: {
-      _key?: string | null;
       url?: string | null;
       width?: number | null;
       height?: number | null;
@@ -371,6 +375,32 @@ export interface Product {
    */
   dimLength?: string | null;
   /**
+   * Las variantes se gestionan desde la colección Variantes.
+   */
+  variants?: {
+    docs?: (number | Variant)[];
+    hasNextPage?: boolean;
+    totalDocs?: number;
+  };
+  /**
+   * Activa esta opción para crear automáticamente la primera variante de venta al guardar el producto. Se desactiva solo después de crearla. Si ya existe una variante con el mismo SKU, se omite.
+   */
+  createInitialVariant?: boolean | null;
+  /**
+   * Código único. Ej. SIEM-5SL6110-7-PIE. Requerido si activas la creación.
+   */
+  initialVariantSku?: string | null;
+  initialVariantSaleType?: ('piece' | 'box' | 'lot') | null;
+  /**
+   * Para pieza: 1. Para caja o lote: cantidad incluida en el precio.
+   */
+  initialVariantUnitsPerPackage?: number | null;
+  /**
+   * Precio de venta al público. Ej. 299.00
+   */
+  initialVariantPrice?: number | null;
+  initialVariantStock?: number | null;
+  /**
    * Subir en Media (documentType: Imagen de producto) antes de seleccionar aquí.
    */
   images?:
@@ -383,14 +413,6 @@ export interface Product {
    * Subir en Media (documentType: Ficha técnica / Datasheet) antes de seleccionar.
    */
   datasheet?: (number | null) | Media;
-  /**
-   * Las variantes se gestionan desde la colección Variantes.
-   */
-  variants?: {
-    docs?: (number | Variant)[];
-    hasNextPage?: boolean;
-    totalDocs?: number;
-  };
   /**
    * Si se deja vacío, se usa el nombre del producto. Máx. 60 caracteres recomendado.
    */
@@ -415,28 +437,7 @@ export interface Product {
    * Marcado como eliminado. El producto y sus variantes se ocultan del storefront pero se conservan para el historial de órdenes.
    */
   isDeleted?: boolean | null;
-  /**
-   * Fecha y hora en que se marcó como eliminado.
-   */
   deletedAt?: string | null;
-  /**
-   * Activa esta opción para crear automáticamente la primera variante de venta al guardar el producto. Se desactiva solo después de crearla. Si ya existe una variante con el mismo SKU, se omite.
-   */
-  createInitialVariant?: boolean | null;
-  /**
-   * Código único. Ej. SIEM-5SL6110-7-PIE. Requerido si activas la creación.
-   */
-  initialVariantSku?: string | null;
-  initialVariantSaleType?: ('piece' | 'box' | 'lot') | null;
-  /**
-   * Para pieza: 1. Para caja o lote: cantidad incluida en el precio.
-   */
-  initialVariantUnitsPerPackage?: number | null;
-  /**
-   * Precio de venta al público. Ej. 299.00
-   */
-  initialVariantPrice?: number | null;
-  initialVariantStock?: number | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -507,17 +508,42 @@ export interface Variant {
  */
 export interface Order {
   id: number;
+  /**
+   * Se genera automáticamente al crear la orden (ej. ORD-000042). Es el identificador que el cliente envía por WhatsApp y el que puedes buscar en este listado.
+   */
+  orderNumber?: string | null;
+  /**
+   * Evita órdenes duplicadas si el checkout se reenvía. Se genera en el cliente. No editar manualmente.
+   */
+  idempotencyKey?: string | null;
   customer: {
+    customerName?: string | null;
     customerEmail: string;
     /**
-     * ID del usuario en la tabla `users` de Auth.js. Se vincula en Fase 6 (auth real). No editar manualmente.
+     * ID del usuario en la tabla `users` de Auth.js. No editar manualmente.
      */
     customerAuthId?: string | null;
   };
   /**
-   * Solo cambiar manualmente si Stripe no actualizó el estado vía webhook.
+   * Flujo manual: el cliente inicia la orden por WhatsApp. Solicita el pago, recibe el comprobante y marca «Pago confirmado» (esto descuenta el stock). Marca «Entregada» al completar el envío.
    */
-  status: 'pending' | 'paid' | 'failed' | 'cancelled' | 'fulfilled';
+  status: 'pending' | 'payment_pending' | 'paid' | 'fulfilled' | 'cancelled';
+  /**
+   * Indica si el inventario ya se descontó por esta orden. Se administra automáticamente: se descuenta al confirmar el pago y se restaura si la orden se cancela. No editar manualmente.
+   */
+  stockDecremented?: boolean | null;
+  /**
+   * Fecha en que el cliente abrió el mensaje de WhatsApp desde su orden. Sirve para saber si ya inició contacto. Se registra automáticamente.
+   */
+  whatsappSentAt?: string | null;
+  shipping?: {
+    name?: string | null;
+    address?: string | null;
+    city?: string | null;
+    state?: string | null;
+    postalCode?: string | null;
+    phone?: string | null;
+  };
   pricing: {
     /**
      * Suma de artículos antes de envío.
@@ -531,18 +557,43 @@ export interface Order {
     taxIncluded?: boolean | null;
   };
   /**
-   * Estos campos son llenados automáticamente por el webhook de Stripe. No editar.
+   * Comprobantes de transferencia o pago (imagen o PDF). Los sube el cliente desde el detalle de su orden, o el administrador si los recibió por otro medio (WhatsApp, correo, etc.). Revísalos antes de confirmar el pago.
    */
-  stripe?: {
-    /**
-     * Ej. pi_3Qxxx. Se completa en Fase 6 (integración Stripe).
-     */
-    stripePaymentIntentId?: string | null;
-    /**
-     * Ej. cs_test_xxx. Se completa en Fase 6.
-     */
-    stripeCheckoutSessionId?: string | null;
-  };
+  paymentProofs?:
+    | {
+        file: number | Media;
+        uploadedBy?: ('customer' | 'admin') | null;
+        uploadedAt?: string | null;
+        /**
+         * Revisa cada comprobante. «Aceptado» no confirma el pago por sí solo (usa el estado de la orden para eso); «Rechazado» notifica al cliente.
+         */
+        reviewStatus?: ('pending' | 'accepted' | 'rejected') | null;
+        /**
+         * Motivo visible para el cliente (ej. «el monto no coincide»). Se incluye en el correo al rechazar.
+         */
+        reviewNote?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * Registro automático de cada cambio de estado (quién, cuándo y por qué). Solo lectura.
+   */
+  statusHistory?:
+    | {
+        status?: ('pending' | 'payment_pending' | 'paid' | 'fulfilled' | 'cancelled') | null;
+        changedAt?: string | null;
+        /**
+         * "customer", "admin" o "system".
+         */
+        changedBy?: string | null;
+        note?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * Instrucciones de entrega proporcionadas por el cliente al hacer el pedido.
+   */
+  notes?: string | null;
   /**
    * Notas privadas del equipo sobre esta orden. Nunca visibles para el cliente.
    */
@@ -577,6 +628,10 @@ export interface OrderItem {
    * Copia del SKU al momento de la compra. No editar.
    */
   variantSkuSnapshot: string;
+  /**
+   * Copia de la etiqueta de la variante (ej. «Caja × 10 piezas») al momento de la compra. No editar.
+   */
+  variantLabelSnapshot?: string | null;
   /**
    * Número de unidades compradas de esta variante.
    */
@@ -804,8 +859,8 @@ export interface MediaSelect<T extends boolean = true> {
   alt?: T;
   caption?: T;
   documentType?: T;
-  _key?: T;
-  prefix?: T;
+  isDeleted?: T;
+  deletedAt?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;
@@ -823,7 +878,6 @@ export interface MediaSelect<T extends boolean = true> {
         thumbnail?:
           | T
           | {
-              _key?: T;
               url?: T;
               width?: T;
               height?: T;
@@ -834,7 +888,6 @@ export interface MediaSelect<T extends boolean = true> {
         card?:
           | T
           | {
-              _key?: T;
               url?: T;
               width?: T;
               height?: T;
@@ -897,6 +950,13 @@ export interface ProductsSelect<T extends boolean = true> {
   material?: T;
   dimDiameter?: T;
   dimLength?: T;
+  variants?: T;
+  createInitialVariant?: T;
+  initialVariantSku?: T;
+  initialVariantSaleType?: T;
+  initialVariantUnitsPerPackage?: T;
+  initialVariantPrice?: T;
+  initialVariantStock?: T;
   images?:
     | T
     | {
@@ -904,7 +964,6 @@ export interface ProductsSelect<T extends boolean = true> {
         id?: T;
       };
   datasheet?: T;
-  variants?: T;
   metaTitle?: T;
   metaDescription?: T;
   metaImage?: T;
@@ -912,12 +971,6 @@ export interface ProductsSelect<T extends boolean = true> {
   featured?: T;
   isDeleted?: T;
   deletedAt?: T;
-  createInitialVariant?: T;
-  initialVariantSku?: T;
-  initialVariantSaleType?: T;
-  initialVariantUnitsPerPackage?: T;
-  initialVariantPrice?: T;
-  initialVariantStock?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -946,13 +999,28 @@ export interface VariantsSelect<T extends boolean = true> {
  * via the `definition` "orders_select".
  */
 export interface OrdersSelect<T extends boolean = true> {
+  orderNumber?: T;
+  idempotencyKey?: T;
   customer?:
     | T
     | {
+        customerName?: T;
         customerEmail?: T;
         customerAuthId?: T;
       };
   status?: T;
+  stockDecremented?: T;
+  whatsappSentAt?: T;
+  shipping?:
+    | T
+    | {
+        name?: T;
+        address?: T;
+        city?: T;
+        state?: T;
+        postalCode?: T;
+        phone?: T;
+      };
   pricing?:
     | T
     | {
@@ -961,12 +1029,26 @@ export interface OrdersSelect<T extends boolean = true> {
         total?: T;
         taxIncluded?: T;
       };
-  stripe?:
+  paymentProofs?:
     | T
     | {
-        stripePaymentIntentId?: T;
-        stripeCheckoutSessionId?: T;
+        file?: T;
+        uploadedBy?: T;
+        uploadedAt?: T;
+        reviewStatus?: T;
+        reviewNote?: T;
+        id?: T;
       };
+  statusHistory?:
+    | T
+    | {
+        status?: T;
+        changedAt?: T;
+        changedBy?: T;
+        note?: T;
+        id?: T;
+      };
+  notes?: T;
   internalNotes?: T;
   items?: T;
   updatedAt?: T;
@@ -982,6 +1064,7 @@ export interface OrderItemsSelect<T extends boolean = true> {
   variant?: T;
   productNameSnapshot?: T;
   variantSkuSnapshot?: T;
+  variantLabelSnapshot?: T;
   quantity?: T;
   unitPrice?: T;
   total?: T;
@@ -1116,6 +1199,32 @@ export interface Setting {
     taxIncludedByDefault?: boolean | null;
   };
   /**
+   * Datos bancarios e instrucciones de pago. Se muestran al cliente en su orden, en el mensaje de WhatsApp y en el correo de confirmación.
+   */
+  payment?: {
+    /**
+     * Ej. BBVA, Santander.
+     */
+    bankName?: string | null;
+    accountHolder?: string | null;
+    /**
+     * 18 dígitos. Es el dato principal para transferencias.
+     */
+    clabe?: string | null;
+    /**
+     * Opcional.
+     */
+    accountNumber?: string | null;
+    /**
+     * Texto libre. Ej. «Envía tu comprobante por WhatsApp o desde tu orden».
+     */
+    paymentInstructions?: string | null;
+    /**
+     * Opcional. Las órdenes pendientes sin pago se cancelan automáticamente después de estos días (deja vacío para usar el valor por defecto, 7).
+     */
+    pendingOrderTtlDays?: number | null;
+  };
+  /**
    * Banner informativo opcional que aparece en la parte superior del storefront.
    */
   announcement?: {
@@ -1148,6 +1257,16 @@ export interface SettingsSelect<T extends boolean = true> {
         flatShippingRate?: T;
         currency?: T;
         taxIncludedByDefault?: T;
+      };
+  payment?:
+    | T
+    | {
+        bankName?: T;
+        accountHolder?: T;
+        clabe?: T;
+        accountNumber?: T;
+        paymentInstructions?: T;
+        pendingOrderTtlDays?: T;
       };
   announcement?:
     | T

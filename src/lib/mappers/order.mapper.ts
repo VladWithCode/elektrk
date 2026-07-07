@@ -4,14 +4,15 @@
  * Converts raw Payload CMS order documents into storefront
  * OrderSummary / OrderDetail types.
  *
- * Payload shape (src/collections/Orders.ts + OrderItems.ts) — Phase 10B:
+ * Payload shape (src/collections/Orders.ts + OrderItems.ts):
  *
  *   Orders:
- *     - id, status, createdAt, updatedAt
- *     - customer group:  { customerAuthId, customerEmail }
+ *     - id, orderNumber, status, createdAt, updatedAt
+ *     - customer group:  { customerName, customerAuthId, customerEmail }
+ *     - shipping group:  { name, address, city, state, postalCode, phone }
  *     - pricing group:   { subtotal, shipping, total, taxIncluded }
- *     - stripe group:    { stripePaymentIntentId, stripeCheckoutSessionId }
- *     - internalNotes    (top-level text)
+ *     - notes            (buyer notes, customer-facing)
+ *     - internalNotes    (admin-only — never mapped to OrderDetail)
  *     - items join → OrderItems[] (populated at depth ≥ 1 as { docs: [...] })
  *
  *   OrderItems:
@@ -30,8 +31,13 @@ import type {
   OrderItemSummary,
   OrderStatus,
   ShippingAddress,
+  PaymentProof,
+  PaymentProofUploader,
+  PaymentProofReviewStatus,
+  OrderStatusChange,
 } from "@/types/order";
 import { isValidOrderStatus, ORDER_STATUS_LABELS } from "@/types/order";
+import { formatOrderNumber } from "@/lib/whatsapp/order-message";
 
 // ---------------------------------------------------------------------------
 // Raw Payload shapes — aligned with actual collections
@@ -46,18 +52,31 @@ export interface RawPayloadOrderItem {
   /** Snapshot fields — flat, not nested in a group. */
   productNameSnapshot?: unknown;
   variantSkuSnapshot?: unknown;
+  variantLabelSnapshot?: unknown;
 }
 
 export interface RawPayloadOrder {
   id: string;
+  orderNumber?: unknown;
   status?: unknown;
   createdAt?: unknown;
   updatedAt?: unknown;
 
-  /** customer group: { customerAuthId, customerEmail } */
+  /** customer group: { customerName, customerAuthId, customerEmail } */
   customer?: {
+    customerName?: unknown;
     customerAuthId?: unknown;
     customerEmail?: unknown;
+  };
+
+  /** shipping group: { name, address, city, state, postalCode, phone } */
+  shipping?: {
+    name?: unknown;
+    address?: unknown;
+    city?: unknown;
+    state?: unknown;
+    postalCode?: unknown;
+    phone?: unknown;
   };
 
   /** pricing group: { subtotal, shipping, total, taxIncluded } */
@@ -68,14 +87,14 @@ export interface RawPayloadOrder {
     taxIncluded?: unknown;
   };
 
-  /** stripe group: { stripePaymentIntentId, stripeCheckoutSessionId } */
-  stripe?: {
-    stripePaymentIntentId?: unknown;
-    stripeCheckoutSessionId?: unknown;
-  };
+  /** Buyer-facing delivery notes. */
+  notes?: unknown;
 
-  /** Admin-only internal notes field. */
-  internalNotes?: unknown;
+  /** paymentProofs array: [{ id, file: media, uploadedBy, uploadedAt }] */
+  paymentProofs?: unknown;
+
+  /** statusHistory array: [{ status, changedAt, changedBy, note }] */
+  statusHistory?: unknown;
 
   /**
    * Populated join — Payload v3 join fields return { docs: [...], hasNextPage: bool }
@@ -93,9 +112,9 @@ export function mapPayloadOrderItem(raw: RawPayloadOrderItem): OrderItemSummary 
     id: raw.id,
     productName: str(raw.productNameSnapshot) ?? "Producto",
     // productSlug and imageUrl are not stored in the OrderItems collection —
-    // these are intentional nulls; snapshots preserve name/sku/price only.
+    // these are intentional nulls; snapshots preserve name/sku/label/price only.
     productSlug: null,
-    variantLabel: "",
+    variantLabel: str(raw.variantLabelSnapshot) ?? "",
     variantSku: str(raw.variantSkuSnapshot) ?? "",
     unitPrice: num(raw.unitPrice),
     quantity: num(raw.quantity, 1),
@@ -122,11 +141,11 @@ export function mapPayloadOrder(raw: RawPayloadOrder): OrderDetail {
   const shipping = num(raw.pricing?.shipping);
   const total = num(raw.pricing?.total) || subtotal + shipping;
 
-  // The Orders collection has no shipping address group (added in a later phase).
-  const shippingAddress: ShippingAddress | null = null;
+  const shippingAddress = mapShippingAddress(raw.shipping);
 
   return {
     id: raw.id,
+    orderNumber: str(raw.orderNumber) ?? formatOrderNumber(raw.id),
     createdAt,
     displayDate,
     status,
@@ -137,10 +156,132 @@ export function mapPayloadOrder(raw: RawPayloadOrder): OrderDetail {
     customerEmail: str(raw.customer?.customerEmail) ?? "",
     customerAuthId: str(raw.customer?.customerAuthId) ?? "",
     items,
+    paymentProofs: mapPaymentProofs(raw.paymentProofs),
+    statusHistory: mapStatusHistory(raw.statusHistory),
     shippingAddress,
-    stripeCheckoutSessionId: str(raw.stripe?.stripeCheckoutSessionId),
-    stripePaymentIntentId: str(raw.stripe?.stripePaymentIntentId),
-    notes: str(raw.internalNotes),
+    notes: str(raw.notes),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Status history
+// ---------------------------------------------------------------------------
+
+function mapStatusHistory(value: unknown): OrderStatusChange[] {
+  if (!Array.isArray(value)) return [];
+  const entries: OrderStatusChange[] = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== "object") continue;
+    const row = raw as {
+      status?: unknown;
+      changedAt?: unknown;
+      changedBy?: unknown;
+      note?: unknown;
+    };
+    entries.push({
+      status: isValidOrderStatus(row.status) ? row.status : "pending",
+      changedAt: str(row.changedAt),
+      changedBy: str(row.changedBy) ?? "system",
+      note: str(row.note),
+    });
+  }
+  // Oldest → newest (rows are appended chronologically, but sort defensively).
+  entries.sort((a, b) => {
+    const ta = a.changedAt ? new Date(a.changedAt).getTime() : 0;
+    const tb = b.changedAt ? new Date(b.changedAt).getTime() : 0;
+    return ta - tb;
+  });
+  return entries;
+}
+
+// ---------------------------------------------------------------------------
+// Payment proofs
+// ---------------------------------------------------------------------------
+
+const UPLOADTHING_PUBLIC_BASE = "https://utfs.io/f/";
+
+interface RawMediaRef {
+  id?: unknown;
+  _key?: unknown;
+  filename?: unknown;
+  mimeType?: unknown;
+  url?: unknown;
+  sizes?: Record<string, { _key?: unknown } | null> | null;
+}
+
+/** Resolves the public URL for a media doc (uploadthing key first, else url). */
+function resolveProofUrl(file: RawMediaRef): string | null {
+  if (typeof file._key === "string" && file._key) {
+    return UPLOADTHING_PUBLIC_BASE + file._key;
+  }
+  const sizes = file.sizes;
+  if (sizes) {
+    for (const s of Object.values(sizes)) {
+      if (s && typeof s._key === "string" && s._key) {
+        return UPLOADTHING_PUBLIC_BASE + s._key;
+      }
+    }
+  }
+  return str(file.url);
+}
+
+function mapPaymentProofs(value: unknown): PaymentProof[] {
+  if (!Array.isArray(value)) return [];
+  const proofs: PaymentProof[] = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== "object") continue;
+    const row = raw as {
+      id?: unknown;
+      file?: unknown;
+      uploadedBy?: unknown;
+      uploadedAt?: unknown;
+      reviewStatus?: unknown;
+      reviewNote?: unknown;
+    };
+    // `file` is the populated media doc at depth ≥ 2; skip if not populated.
+    if (!row.file || typeof row.file !== "object") continue;
+    const file = row.file as RawMediaRef;
+    const mimeType = str(file.mimeType) ?? "";
+    const reviewStatus: PaymentProofReviewStatus =
+      row.reviewStatus === "accepted" || row.reviewStatus === "rejected"
+        ? row.reviewStatus
+        : "pending";
+    proofs.push({
+      id: str(row.id) ?? String(file.id ?? ""),
+      url: resolveProofUrl(file),
+      filename: str(file.filename) ?? "comprobante",
+      isImage: mimeType.startsWith("image/"),
+      uploadedBy: (row.uploadedBy === "customer" ? "customer" : "admin") as PaymentProofUploader,
+      uploadedAt: str(row.uploadedAt),
+      reviewStatus,
+      reviewNote: str(row.reviewNote),
+    });
+  }
+  return proofs;
+}
+
+/**
+ * Builds a ShippingAddress from the Orders `shipping` group.
+ * Returns null when no shipping data was captured (e.g. legacy orders).
+ */
+function mapShippingAddress(
+  shipping: RawPayloadOrder["shipping"]
+): ShippingAddress | null {
+  if (!shipping) return null;
+  const name = str(shipping.name);
+  const address = str(shipping.address);
+  const city = str(shipping.city);
+  const state = str(shipping.state);
+  const postalCode = str(shipping.postalCode);
+  // Treat the address as present only when there is something meaningful.
+  if (!name && !address && !city && !state && !postalCode) return null;
+  return {
+    name: name ?? "",
+    address: address ?? "",
+    city: city ?? "",
+    state: state ?? "",
+    postalCode: postalCode ?? "",
+    phone: str(shipping.phone),
   };
 }
 
@@ -157,6 +298,7 @@ export function mapPayloadOrderToSummary(raw: RawPayloadOrder): OrderSummary {
 
   return {
     id: raw.id,
+    orderNumber: str(raw.orderNumber) ?? formatOrderNumber(raw.id),
     createdAt,
     displayDate,
     status,
@@ -219,10 +361,6 @@ function formatDisplayDate(iso: string): string {
     return iso;
   }
 }
-
-// Unused but kept to satisfy the ShippingAddress import (used in mapPayloadOrder return type)
-const _shippingAddressTypeCheck: ShippingAddress | null = null;
-void _shippingAddressTypeCheck;
 
 // Re-export for convenience
 export { ORDER_STATUS_LABELS };

@@ -234,7 +234,7 @@ export function CartPageClient({
               </p>
             )}
             <p className="text-xs text-center text-muted-foreground">
-              Pago seguro · Stripe
+              Coordina el pago por WhatsApp
             </p>
           </div>
         </div>

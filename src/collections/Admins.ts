@@ -1,4 +1,13 @@
-import type { CollectionConfig } from "payload";
+import type { CollectionConfig, CollectionBeforeChangeHook } from "payload";
+import { guardUniqueEmail } from "../lib/payload-unique-guards";
+
+const checkUniqueEmail: CollectionBeforeChangeHook = async ({ data, originalDoc, operation, req }) => {
+  const email = typeof data.email === "string" ? data.email.trim() : "";
+  if (!email) return data;
+  const currentId = operation === "update" ? originalDoc?.id : undefined;
+  await guardUniqueEmail(req, email, currentId);
+  return data;
+};
 
 export const Admins: CollectionConfig = {
   slug: "admins",
@@ -12,6 +21,9 @@ export const Admins: CollectionConfig = {
     create: ({ req }) => req.user?.collection === "admins",
     update: ({ req }) => req.user?.collection === "admins",
     delete: ({ req }) => req.user?.collection === "admins",
+  },
+  hooks: {
+    beforeChange: [checkUniqueEmail],
   },
   fields: [
     {

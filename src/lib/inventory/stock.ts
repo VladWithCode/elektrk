@@ -15,7 +15,7 @@
  * Price security:
  *   This module returns the server-authoritative price for every variant so
  *   submitCheckout() can override whatever the client sent. Client prices are
- *   never trusted for order totals or Stripe line items.
+ *   never trusted for order totals.
  */
 
 import type { CheckoutCartItem } from "@/types/order";

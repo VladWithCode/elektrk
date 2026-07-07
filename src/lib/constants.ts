@@ -20,20 +20,15 @@ export const TICKET_STATUS_CONFIG: Record<
   resolved: { label: "Resuelto", icon: CheckCircle, variant: "outline" },
 };
 
-// ORDER_STATUS_VARIANT keyed by canonical OrderStatus (Phase 10A).
+// ORDER_STATUS_VARIANT keyed by canonical OrderStatus.
 // See ORDER_STATUS_BADGE_VARIANT in src/types/order.ts for the full record.
 export const ORDER_STATUS_VARIANT: Record<
   string,
   "default" | "secondary" | "outline"
 > = {
-  // Legacy Spanish keys — kept for any remaining uses
-  Entregado:    "secondary",
-  "En tránsito":"default",
-  Pendiente:    "outline",
-  // Canonical English keys
-  fulfilled: "default",
-  paid:      "secondary",
-  pending:   "outline",
-  cancelled: "outline",
-  failed:    "outline",
+  pending:         "outline",
+  payment_pending: "secondary",
+  paid:            "default",
+  fulfilled:       "default",
+  cancelled:       "outline",
 };

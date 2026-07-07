@@ -49,3 +49,6 @@ next-env.d.ts
 
 # Media
 /public/media
+
+# Importer files
+/importer/

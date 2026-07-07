@@ -1,6 +1,20 @@
-import type { CollectionConfig, CollectionAfterChangeHook, CollectionBeforeDeleteHook } from "payload";
-import { APIError } from "payload";
+import { type CollectionConfig, type CollectionAfterChangeHook, type CollectionBeforeChangeHook, type CollectionBeforeValidateHook, APIError } from "payload";
 import { isAdmin } from "../lib/payload-access";
+import { guardProductDelete } from "../lib/payload-delete-guards";
+import { guardUniqueSlug } from "../lib/payload-unique-guards";
+import { validateNumber } from "../lib/payload-validation-guards";
+
+// ---------------------------------------------------------------------------
+// beforeValidate hook — clearer validation messages
+// ---------------------------------------------------------------------------
+
+const validateProductFields: CollectionBeforeValidateHook = ({ data }) => {
+  if (!data) return data;
+  validateNumber(data.amperage, "El amperaje", 0);
+  validateNumber(data.voltage, "El voltaje", 0);
+  validateNumber(data.stock, "El stock", 0);
+  return data;
+};
 
 // ---------------------------------------------------------------------------
 // Slug generation helper
@@ -85,23 +99,27 @@ const createInitialVariantHook: CollectionAfterChangeHook = async ({
 };
 
 // ---------------------------------------------------------------------------
-// beforeDelete hook — soft delete instead of hard delete
+// afterChange hook — cascade soft delete / restore to variants
 // ---------------------------------------------------------------------------
 
-const softDeleteHook: CollectionBeforeDeleteHook = async ({ id, req }) => {
-  const { payload } = req;
-  const now = new Date().toISOString();
+const cascadeSoftDeleteToVariants: CollectionAfterChangeHook = async ({
+  doc,
+  previousDoc,
+  operation,
+  req,
+}) => {
+  if (operation !== "update" || !previousDoc) return doc;
 
-  await payload.update({
-    collection: "products",
-    id,
-    data: { isDeleted: true, deletedAt: now },
-    req,
-  });
+  const wasTrashed = !!previousDoc.deletedAt;
+  const isTrashed = !!doc.deletedAt;
+
+  if (wasTrashed === isTrashed) return doc;
+
+  const { payload } = req;
 
   const variants = await payload.find({
     collection: "variants",
-    where: { product: { equals: id } },
+    where: { product: { equals: doc.id } },
     limit: 0,
     req,
   });
@@ -110,10 +128,15 @@ const softDeleteHook: CollectionBeforeDeleteHook = async ({ id, req }) => {
     await payload.update({
       collection: "variants",
       id: variant.id,
-      data: { isDeleted: true, deletedAt: now },
+      data: {
+        isDeleted: isTrashed,
+        deletedAt: isTrashed ? doc.deletedAt : null,
+      },
       req,
     });
   }
+
+  return doc;
 };
 
 // ---------------------------------------------------------------------------
@@ -139,17 +162,37 @@ export const Products: CollectionConfig = {
     delete: isAdmin,
   },
   timestamps: true,
+  trash: true,
   hooks: {
+    beforeValidate: [validateProductFields],
     beforeChange: [
       ({ data }) => {
         if (!data.slug && typeof data.name === "string" && data.name.trim()) {
           data.slug = slugifyText(data.name);
         }
+        // Keep isDeleted in sync with deletedAt for trash support
+        if (data.deletedAt && !data.isDeleted) {
+          data.isDeleted = true;
+        }
+        if (!data.deletedAt && data.isDeleted) {
+          data.isDeleted = false;
+        }
+        return data;
+      },
+      async ({ data, originalDoc, operation, req }) => {
+        const slug = typeof data.slug === "string" ? data.slug.trim() : "";
+        if (!slug) return data;
+        const currentId = operation === "update" ? originalDoc?.id : undefined;
+        await guardUniqueSlug(req, slug, currentId);
         return data;
       },
     ],
-    afterChange: [createInitialVariantHook],
-    beforeDelete: [softDeleteHook],
+    beforeDelete: [
+      async ({ id, req }) => {
+        await guardProductDelete(req, id);
+      },
+    ],
+    afterChange: [createInitialVariantHook, cascadeSoftDeleteToVariants],
   },
   fields: [
     // -------------------------------------------------------------------------
@@ -663,43 +706,11 @@ export const Products: CollectionConfig = {
         },
 
         // -------------------------------------------------------------------
-        // Tab 3: Media
+        // Tab 3: Variantes
         // -------------------------------------------------------------------
         {
-          label: "Media",
+          label: "Variantes",
           fields: [
-            {
-              name: "images",
-              type: "array",
-              label: "Imágenes del producto",
-              admin: {
-                description: "Subir en Media (documentType: Imagen de producto) antes de seleccionar aquí.",
-              },
-              fields: [
-                {
-                  name: "image",
-                  type: "relationship",
-                  relationTo: "media",
-                  label: "Imagen",
-                  required: true,
-                  filterOptions: {
-                    documentType: { equals: "image" },
-                  },
-                },
-              ],
-            },
-            {
-              name: "datasheet",
-              type: "relationship",
-              relationTo: "media",
-              label: "Ficha técnica (PDF)",
-              admin: {
-                description: "Subir en Media (documentType: Ficha técnica / Datasheet) antes de seleccionar.",
-              },
-              filterOptions: {
-                documentType: { equals: "datasheet" },
-              },
-            },
             // Virtual join — populated by Payload from Variants collection
             {
               name: "variants",
@@ -711,102 +722,6 @@ export const Products: CollectionConfig = {
                 description: "Las variantes se gestionan desde la colección Variantes.",
               },
             },
-          ],
-        },
-
-        // -------------------------------------------------------------------
-        // Tab 4: SEO
-        // -------------------------------------------------------------------
-        {
-          label: "SEO",
-          fields: [
-            {
-              name: "metaTitle",
-              type: "text",
-              label: "Título SEO",
-              admin: {
-                description: "Si se deja vacío, se usa el nombre del producto. Máx. 60 caracteres recomendado.",
-              },
-            },
-            {
-              name: "metaDescription",
-              type: "textarea",
-              label: "Descripción SEO",
-              admin: {
-                description:
-                  "Si se deja vacía, se usa la descripción completa truncada. Máx. 160 caracteres recomendado.",
-              },
-            },
-            {
-              name: "metaImage",
-              type: "relationship",
-              relationTo: "media",
-              label: "Imagen Open Graph / Social",
-              admin: {
-                description: "Imagen que aparece al compartir en redes sociales. Recomendado: 1200×630 px.",
-              },
-            },
-          ],
-        },
-
-        // -------------------------------------------------------------------
-        // Tab 5: Estado y visibilidad
-        // -------------------------------------------------------------------
-        {
-          label: "Estado",
-          fields: [
-            {
-              name: "isActive",
-              type: "checkbox",
-              label: "Producto activo",
-              defaultValue: true,
-              admin: {
-                description:
-                  "Desactivar para ocultar el producto del storefront sin eliminarlo. " +
-                  "Los admins siempre pueden verlo.",
-              },
-            },
-            {
-              name: "featured",
-              type: "checkbox",
-              label: "Destacado en home",
-              defaultValue: false,
-              admin: {
-                description:
-                  "Aparece en la sección 'Productos destacados' de la página de inicio.",
-              },
-            },
-            {
-              name: "isDeleted",
-              type: "checkbox",
-              label: "Eliminado (soft delete)",
-              defaultValue: false,
-              admin: {
-                description:
-                  "Marcado como eliminado. El producto y sus variantes se ocultan del storefront " +
-                  "pero se conservan para el historial de órdenes.",
-                readOnly: true,
-              },
-            },
-            {
-              name: "deletedAt",
-              type: "date",
-              label: "Fecha de eliminación",
-              admin: {
-                description: "Fecha y hora en que se marcó como eliminado.",
-                readOnly: true,
-                condition: (data) => !!data.isDeleted,
-              },
-            },
-          ],
-        },
-
-        // -------------------------------------------------------------------
-        // Tab 6: Variante inicial (atajo de creación rápida)
-        // -------------------------------------------------------------------
-        {
-          label: "Variante inicial",
-          fields: [
             {
               name: "createInitialVariant",
               type: "checkbox",
@@ -872,6 +787,134 @@ export const Products: CollectionConfig = {
               defaultValue: 0,
               admin: {
                 condition: (data) => !!data.createInitialVariant,
+              },
+            },
+          ],
+        },
+
+        // -------------------------------------------------------------------
+        // Tab 4: Media
+        // -------------------------------------------------------------------
+        {
+          label: "Media",
+          fields: [
+            {
+              name: "images",
+              type: "array",
+              label: "Imágenes del producto",
+              admin: {
+                description: "Subir en Media (documentType: Imagen de producto) antes de seleccionar aquí.",
+              },
+              fields: [
+                {
+                  name: "image",
+                  type: "relationship",
+                  relationTo: "media",
+                  label: "Imagen",
+                  required: true,
+                  filterOptions: {
+                    documentType: { equals: "image" },
+                  },
+                },
+              ],
+            },
+            {
+              name: "datasheet",
+              type: "relationship",
+              relationTo: "media",
+              label: "Ficha técnica (PDF)",
+              admin: {
+                description: "Subir en Media (documentType: Ficha técnica / Datasheet) antes de seleccionar.",
+              },
+              filterOptions: {
+                documentType: { equals: "datasheet" },
+              },
+            },
+          ],
+        },
+
+        // -------------------------------------------------------------------
+        // Tab 5: SEO
+        // -------------------------------------------------------------------
+        {
+          label: "SEO",
+          fields: [
+            {
+              name: "metaTitle",
+              type: "text",
+              label: "Título SEO",
+              admin: {
+                description: "Si se deja vacío, se usa el nombre del producto. Máx. 60 caracteres recomendado.",
+              },
+            },
+            {
+              name: "metaDescription",
+              type: "textarea",
+              label: "Descripción SEO",
+              admin: {
+                description:
+                  "Si se deja vacía, se usa la descripción completa truncada. Máx. 160 caracteres recomendado.",
+              },
+            },
+            {
+              name: "metaImage",
+              type: "relationship",
+              relationTo: "media",
+              label: "Imagen Open Graph / Social",
+              admin: {
+                description: "Imagen que aparece al compartir en redes sociales. Recomendado: 1200×630 px.",
+              },
+            },
+          ],
+        },
+
+        // -------------------------------------------------------------------
+        // Tab 6: Estado y visibilidad
+        // -------------------------------------------------------------------
+        {
+          label: "Estado",
+          fields: [
+            {
+              name: "isActive",
+              type: "checkbox",
+              label: "Producto activo",
+              defaultValue: true,
+              admin: {
+                description:
+                  "Desactivar para ocultar el producto del storefront sin eliminarlo. " +
+                  "Los admins siempre pueden verlo.",
+              },
+            },
+            {
+              name: "featured",
+              type: "checkbox",
+              label: "Destacado en home",
+              defaultValue: false,
+              admin: {
+                description:
+                  "Aparece en la sección 'Productos destacados' de la página de inicio.",
+              },
+            },
+            {
+              name: "isDeleted",
+              type: "checkbox",
+              label: "Eliminado (soft delete)",
+              defaultValue: false,
+              admin: {
+                description:
+                  "Marcado como eliminado. El producto y sus variantes se ocultan del storefront " +
+                  "pero se conservan para el historial de órdenes.",
+                readOnly: true,
+              },
+            },
+            {
+              name: "deletedAt",
+              type: "date",
+              label: "Fecha de eliminación",
+              admin: {
+                description: "Fecha y hora en que se marcó como eliminado.",
+                readOnly: true,
+                condition: (data) => !!data.isDeleted,
               },
             },
           ],

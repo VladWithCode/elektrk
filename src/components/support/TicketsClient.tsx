@@ -28,6 +28,7 @@ import {
   isValidTicketPriority,
 } from "@/types/ticket";
 import { createTicket as createTicketAction } from "@/app/(store)/support/tickets/actions";
+import { formatOrderNumber } from "@/lib/whatsapp/order-message";
 
 // Status badge config
 const STATUS_CONFIG: Record<
@@ -312,7 +313,7 @@ export function TicketsClient({ initialTickets, userEmail, userAuthId }: Tickets
                 {(ticket.productName ?? ticket.orderId) && (
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                     {ticket.productName && <span>Producto: {ticket.productName}</span>}
-                    {ticket.orderId && <span>Orden: {ticket.orderId}</span>}
+                    {ticket.orderId && <span>Orden: {formatOrderNumber(ticket.orderId)}</span>}
                   </div>
                 )}
 

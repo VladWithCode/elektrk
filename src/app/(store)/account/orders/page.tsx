@@ -66,7 +66,7 @@ export default async function OrdersPage() {
               <div className="flex items-center gap-4 min-w-0">
                 <Package className="h-5 w-5 text-muted-foreground shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-card-foreground truncate">{order.id}</p>
+                  <p className="text-sm font-semibold text-card-foreground truncate">{order.orderNumber}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {order.displayDate} · {order.itemCount}{" "}
                     {order.itemCount === 1 ? "producto" : "productos"}

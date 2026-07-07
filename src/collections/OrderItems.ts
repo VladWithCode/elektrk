@@ -1,5 +1,14 @@
-import type { CollectionConfig } from "payload";
+import type { CollectionConfig, CollectionBeforeValidateHook } from "payload";
 import { isAdmin } from "../lib/payload-access";
+import { validateNumber } from "../lib/payload-validation-guards";
+
+const validateOrderItemFields: CollectionBeforeValidateHook = ({ data }) => {
+  if (!data) return data;
+  validateNumber(data.quantity, "La cantidad", 1);
+  validateNumber(data.unitPrice, "El precio unitario", 0);
+  validateNumber(data.total, "El total", 0);
+  return data;
+};
 
 export const OrderItems: CollectionConfig = {
   slug: "order-items",
@@ -17,6 +26,9 @@ export const OrderItems: CollectionConfig = {
     create: isAdmin,
     update: isAdmin,
     delete: isAdmin,
+  },
+  hooks: {
+    beforeValidate: [validateOrderItemFields],
   },
   fields: [
     // -------------------------------------------------------------------------
@@ -72,6 +84,17 @@ export const OrderItems: CollectionConfig = {
       required: true,
       admin: {
         description: "Copia del SKU al momento de la compra. No editar.",
+        readOnly: true,
+      },
+    },
+    {
+      name: "variantLabelSnapshot",
+      type: "text",
+      label: "Variante (snapshot)",
+      admin: {
+        description:
+          "Copia de la etiqueta de la variante (ej. «Caja × 10 piezas») al momento " +
+          "de la compra. No editar.",
         readOnly: true,
       },
     },

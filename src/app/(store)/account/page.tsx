@@ -144,7 +144,7 @@ export default async function AccountPage() {
                     <div className="flex items-center gap-3">
                       <Package className="h-4 w-4 text-muted-foreground" />
                       <div>
-                        <p className="text-sm font-medium text-card-foreground">{order.id}</p>
+                        <p className="text-sm font-medium text-card-foreground">{order.orderNumber}</p>
                         <p className="text-xs text-muted-foreground">
                           {order.displayDate} · {order.itemCount}{" "}
                           {order.itemCount === 1 ? "producto" : "productos"}

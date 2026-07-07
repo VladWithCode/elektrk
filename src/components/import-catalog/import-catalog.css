@@ -1,0 +1,254 @@
+/* Importador de catálogo — estilos sobre las variables de tema de Payload. */
+
+.import-catalog {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding-bottom: 4rem;
+}
+
+.import-catalog__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.import-catalog__title {
+  margin: 0;
+}
+
+.import-catalog__stepper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.import-catalog__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.import-catalog__toolbar--end {
+  margin-left: auto;
+}
+
+.import-catalog__upload {
+  border: 1px dashed var(--theme-elevation-200);
+  border-radius: var(--style-radius-m, 8px);
+  padding: 2.5rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1rem;
+  background: var(--theme-elevation-50);
+}
+
+.import-catalog__cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.import-catalog__card-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.import-catalog__card-title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.import-catalog__card--excluded .import-catalog__card-title {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+
+.import-catalog__fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem 1rem;
+  padding: 0.5rem 0 0.75rem;
+}
+
+.import-catalog__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.import-catalog__field--wide {
+  grid-column: 1 / -1;
+}
+
+.import-catalog__label {
+  font-size: 0.78rem;
+  color: var(--theme-elevation-600);
+}
+
+.import-catalog__input,
+.import-catalog__select,
+.import-catalog__textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.45rem 0.6rem;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--theme-elevation-800);
+  background: var(--theme-input-bg, var(--theme-elevation-0));
+  border: 1px solid var(--theme-elevation-150);
+  border-radius: var(--style-radius-s, 4px);
+}
+
+.import-catalog__input:disabled,
+.import-catalog__select:disabled,
+.import-catalog__textarea:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.import-catalog__input--error,
+.import-catalog__select--error,
+.import-catalog__textarea--error {
+  border-color: var(--theme-error-500);
+}
+
+.import-catalog__error {
+  font-size: 0.75rem;
+  color: var(--theme-error-500);
+}
+
+.import-catalog__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--theme-elevation-800);
+}
+
+.import-catalog__table-wrap {
+  overflow-x: auto;
+  padding: 0.5rem 0 0.75rem;
+}
+
+.import-catalog__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.import-catalog__table th {
+  text-align: left;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--theme-elevation-500);
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid var(--theme-elevation-100);
+  white-space: nowrap;
+}
+
+.import-catalog__table td {
+  padding: 0.3rem 0.5rem;
+  border-bottom: 1px solid var(--theme-elevation-50);
+  vertical-align: top;
+  min-width: 7rem;
+}
+
+.import-catalog__table td.import-catalog__td--narrow {
+  min-width: 4.5rem;
+}
+
+.import-catalog__row--excluded td {
+  opacity: 0.45;
+}
+
+.import-catalog__warnings {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.import-catalog__progress {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.import-catalog__progress-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--theme-elevation-100);
+  overflow: hidden;
+}
+
+.import-catalog__progress-fill {
+  height: 100%;
+  background: var(--theme-success-500);
+  transition: width 0.2s ease;
+}
+
+.import-catalog__summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.import-catalog__summary-stat {
+  border: 1px solid var(--theme-elevation-100);
+  border-radius: var(--style-radius-m, 8px);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  background: var(--theme-elevation-50);
+}
+
+.import-catalog__summary-number {
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+.import-catalog__failed-list {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+}
+
+.import-catalog__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+/*
+ * Payload's Collapsible renders its toggle as an absolutely-positioned button
+ * covering the whole header. Because it is positioned (z-index: auto) it paints
+ * above the static `.collapsible__actions`, so it swallows clicks meant for the
+ * action button. Lifting the actions into a positive stacking layer puts them
+ * back on top, and clearing the icon-sized box lets the text button render and
+ * stay fully clickable.
+ */
+.import-catalog .collapsible__actions {
+  position: relative;
+  z-index: 1;
+  width: auto;
+  height: auto;
+}
