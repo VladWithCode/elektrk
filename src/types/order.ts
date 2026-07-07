@@ -3,10 +3,9 @@
  *
  * Canonical storefront types for orders and order items.
  * Aligned with the Payload Orders / OrderItems collections and
- * the Stripe checkout flow (stripeCheckoutSessionId, stripePaymentIntentId).
- *
- * Phase 10A: used by mock repository and account UI.
- * Phase 7B+: populated from Payload after webhook confirms payment.
+ * the WhatsApp order flow (no online payment — the buyer sends a
+ * pre-filled WhatsApp message to the store and the admin manages
+ * payment + status manually from the dashboard).
  */
 
 // ---------------------------------------------------------------------------
@@ -17,48 +16,48 @@
  * Canonical order lifecycle states.
  * Maps to the `status` field in the Payload Orders collection.
  *
- * pending   → order created, awaiting payment (Stripe session open)
- * paid      → payment confirmed via webhook (checkout.session.completed)
- * failed    → payment failed (payment_intent.payment_failed)
- * cancelled → cancelled by customer or admin before fulfillment
- * fulfilled → shipped / delivered to customer
+ * pending         → order created, buyer has not yet been contacted for payment
+ * payment_pending → admin requested payment / awaiting payment proof
+ * paid            → payment confirmed by the admin (transfer or in-store)
+ * fulfilled       → shipped / delivered to customer
+ * cancelled       → cancelled by customer or admin before fulfillment
  */
 export type OrderStatus =
   | "pending"
+  | "payment_pending"
   | "paid"
-  | "failed"
-  | "cancelled"
-  | "fulfilled";
+  | "fulfilled"
+  | "cancelled";
 
 // ---------------------------------------------------------------------------
 // Display helpers
 // ---------------------------------------------------------------------------
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
-  pending:   "Pendiente",
-  paid:      "Pagado",
-  failed:    "Fallido",
-  cancelled: "Cancelado",
-  fulfilled: "Entregado",
+  pending:         "Recibida",
+  payment_pending: "Pago en revisión",
+  paid:            "Pago confirmado",
+  fulfilled:       "Entregada",
+  cancelled:       "Cancelada",
 };
 
 export const ORDER_STATUS_BADGE_VARIANT: Record<
   OrderStatus,
   "default" | "secondary" | "outline" | "destructive"
 > = {
-  pending:   "outline",
-  paid:      "secondary",
-  failed:    "destructive",
-  cancelled: "outline",
-  fulfilled: "default",
+  pending:         "outline",
+  payment_pending: "secondary",
+  paid:            "default",
+  fulfilled:       "default",
+  cancelled:       "destructive",
 };
 
 export const ORDER_STATUS_OPTIONS: { value: OrderStatus; label: string }[] = [
-  { value: "pending",   label: "Pendiente"  },
-  { value: "paid",      label: "Pagado"     },
-  { value: "failed",    label: "Fallido"    },
-  { value: "cancelled", label: "Cancelado"  },
-  { value: "fulfilled", label: "Entregado"  },
+  { value: "pending",         label: "Recibida"        },
+  { value: "payment_pending", label: "Pago en revisión" },
+  { value: "paid",            label: "Pago confirmado"  },
+  { value: "fulfilled",       label: "Entregada"        },
+  { value: "cancelled",       label: "Cancelada"        },
 ];
 
 // ---------------------------------------------------------------------------
@@ -67,11 +66,11 @@ export const ORDER_STATUS_OPTIONS: { value: OrderStatus; label: string }[] = [
 
 export function isValidOrderStatus(value: unknown): value is OrderStatus {
   return (
-    value === "pending"   ||
-    value === "paid"      ||
-    value === "failed"    ||
-    value === "cancelled" ||
-    value === "fulfilled"
+    value === "pending"         ||
+    value === "payment_pending" ||
+    value === "paid"            ||
+    value === "fulfilled"       ||
+    value === "cancelled"
   );
 }
 
@@ -105,6 +104,64 @@ export interface OrderItemSummary {
 }
 
 // ---------------------------------------------------------------------------
+// Payment proof — receipt attached to an order
+// ---------------------------------------------------------------------------
+
+/** Who attached a given payment proof. */
+export type PaymentProofUploader = "customer" | "admin";
+
+/** Admin review state of a payment proof. */
+export type PaymentProofReviewStatus = "pending" | "accepted" | "rejected";
+
+export const PROOF_REVIEW_LABELS: Record<PaymentProofReviewStatus, string> = {
+  pending:  "Por revisar",
+  accepted: "Aceptado",
+  rejected: "Rechazado",
+};
+
+/**
+ * A receipt (image or PDF) attached to an order as proof of payment.
+ * Uploaded by the customer from their order detail page, or by the admin.
+ */
+export interface PaymentProof {
+  /** Payload array-row id. */
+  id: string;
+  /** Public URL of the file (image or PDF), or null if unresolved. */
+  url: string | null;
+  /** Original filename. */
+  filename: string;
+  /** True when the file is an image (renderable as a thumbnail). */
+  isImage: boolean;
+  /** Who uploaded it. */
+  uploadedBy: PaymentProofUploader;
+  /** ISO 8601 upload timestamp, or null. */
+  uploadedAt: string | null;
+  /** Admin review state (defaults to "pending"). */
+  reviewStatus: PaymentProofReviewStatus;
+  /** Admin note explaining an acceptance/rejection, shown to the customer. */
+  reviewNote: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Status history — append-only audit trail
+// ---------------------------------------------------------------------------
+
+/** Who caused a status change. Stored as free text, conventionally one of these. */
+export type StatusHistoryActor = "customer" | "admin" | "system";
+
+/** A single status-change record, shown to the customer as a timeline entry. */
+export interface OrderStatusChange {
+  /** Status the order moved into. */
+  status: OrderStatus;
+  /** ISO 8601 timestamp, or null. */
+  changedAt: string | null;
+  /** Raw actor value ("customer" | "admin" | "system"). */
+  changedBy: string;
+  /** Optional reason shown to the customer. */
+  note: string | null;
+}
+
+// ---------------------------------------------------------------------------
 // Order summary — list-level
 // ---------------------------------------------------------------------------
 
@@ -114,6 +171,8 @@ export interface OrderItemSummary {
  */
 export interface OrderSummary {
   id: string;
+  /** Human-friendly order reference, e.g. "ORD-000042". Searchable in admin. */
+  orderNumber: string;
   /** ISO 8601 string. */
   createdAt: string;
   status: OrderStatus;
@@ -136,17 +195,17 @@ export interface OrderDetail extends OrderSummary {
   shippingAddress: ShippingAddress | null;
   /** Line items with product snapshots. */
   items: OrderItemSummary[];
+  /** Payment receipts uploaded by the customer or admin. */
+  paymentProofs: PaymentProof[];
+  /** Append-only status-change audit trail (oldest → newest). */
+  statusHistory: OrderStatusChange[];
   /** Subtotal before shipping. */
   subtotal: number;
   /** Shipping cost. */
   shipping: number;
-  /** Stripe Checkout Session ID — cs_test_... or cs_live_... */
-  stripeCheckoutSessionId: string | null;
-  /** Stripe PaymentIntent ID. */
-  stripePaymentIntentId: string | null;
   /** Auth.js user ID of the customer, if logged in at checkout. */
   customerAuthId: string;
-  /** Optional admin notes. */
+  /** Buyer notes / admin notes (delivery instructions). */
   notes: string | null;
 }
 
@@ -184,8 +243,11 @@ export interface CheckoutCartItem {
  * The server action validates and builds this from the session + cart.
  */
 export interface OrderCreateInput {
-  customerAuthId: string;
+  /** Auth.js user id, or null for guest checkout. */
+  customerAuthId: string | null;
   customerEmail: string;
+  /** Client-generated UUID (once per checkout mount) that dedupes resubmits. */
+  idempotencyKey?: string;
   items: CheckoutCartItem[];
   /** Shipping address from the checkout form. */
   shippingName: string;
@@ -202,7 +264,9 @@ export interface OrderCreateInput {
   total: number;
 }
 
-/** Returned by the checkout server action on success. */
+/** Returned by createOrder() in the orders repository. */
 export interface CreateOrderResult {
   orderId: string;
+  /** Human-friendly order reference, e.g. "ORD-000042". */
+  orderNumber: string;
 }

@@ -19,7 +19,6 @@ import {
   AlertCircle,
   CheckCircle2,
   Package,
-  LogIn,
 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { Button } from "@/components/ui/button";
@@ -78,11 +77,17 @@ const EMPTY_FORM: CheckoutForm = {
 const REQUIRED_FIELDS: (keyof CheckoutForm)[] = [
   "nombre",
   "email",
+  "telefono",
   "direccion",
   "ciudad",
   "estado",
   "codigoPostal",
 ];
+
+/** Mexican mobile: at least 10 digits after stripping spaces/dashes/parens. */
+function isValidPhone(value: string): boolean {
+  return value.replace(/\D/g, "").length >= 10;
+}
 
 const ESTADOS_MX = [
   "Aguascalientes", "Baja California", "Baja California Sur", "Campeche",
@@ -93,6 +98,14 @@ const ESTADOS_MX = [
   "Sinaloa", "Sonora", "Tabasco", "Tamaulipas", "Tlaxcala",
   "Veracruz", "Yucatán", "Zacatecas",
 ];
+
+/** Stable-per-mount key so a double-submit / retry can't create two orders. */
+function makeIdempotencyKey(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 
 // ---------------------------------------------------------------------------
 // Component
@@ -127,6 +140,9 @@ export function CheckoutClient({ settings, savedAddresses = [] }: CheckoutClient
   });
   const [submitState, setSubmitState] = useState<"idle" | "loading" | "error">("idle");
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // Generated once per checkout mount; reused across retries so the server
+  // dedupes resubmissions into a single order (§2.4).
+  const [idempotencyKey] = useState(makeIdempotencyKey);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof CheckoutForm, string>>>({});
 
   // Prefill contact fields from session when it becomes available.
@@ -170,40 +186,12 @@ export function CheckoutClient({ settings, savedAddresses = [] }: CheckoutClient
   );
   const cartIsValid = cartErrors.length === 0;
 
-  // Form completeness check
-  const isFormComplete = REQUIRED_FIELDS.every((f) => form[f].trim().length > 0);
+  // Form completeness check (phone must also be a valid 10-digit number)
+  const isFormComplete =
+    REQUIRED_FIELDS.every((f) => form[f].trim().length > 0) &&
+    isValidPhone(form.telefono);
 
-  // --- Auth loading state ---
-  if (sessionStatus === "loading") {
-    return (
-      <div className="flex items-center justify-center min-h-[40vh]">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  // --- Login gate ---
-  if (!session?.user) {
-    return (
-      <div className="mx-auto max-w-md px-4 py-20">
-        <EmptyState
-          icon={LogIn}
-          title="Inicia sesión para continuar"
-          description="Necesitas una cuenta para completar tu compra y ver el historial de órdenes."
-          action={
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Button asChild>
-                <Link href={`/login?callbackUrl=/checkout`}>Iniciar sesión</Link>
-              </Button>
-              <Button asChild variant="outline">
-                <Link href={`/register?callbackUrl=/checkout`}>Crear cuenta</Link>
-              </Button>
-            </div>
-          }
-        />
-      </div>
-    );
-  }
+  const isGuest = sessionStatus !== "loading" && !session?.user;
 
   // --- Empty cart ---
   if (items.length === 0 && submitState !== "loading") {
@@ -239,7 +227,7 @@ export function CheckoutClient({ settings, savedAddresses = [] }: CheckoutClient
     for (const field of REQUIRED_FIELDS) {
       if (!form[field].trim()) {
         const labels: Record<keyof CheckoutForm, string> = {
-          nombre: "Nombre", email: "Correo electrónico", telefono: "Teléfono",
+          nombre: "Nombre", email: "Correo electrónico", telefono: "Celular",
           direccion: "Dirección", ciudad: "Ciudad", estado: "Estado",
           codigoPostal: "Código postal", notas: "Notas",
         };
@@ -248,6 +236,9 @@ export function CheckoutClient({ settings, savedAddresses = [] }: CheckoutClient
     }
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
       errors.email = "El correo electrónico no es válido.";
+    }
+    if (form.telefono && !isValidPhone(form.telefono)) {
+      errors.telefono = "El celular debe tener al menos 10 dígitos.";
     }
     if (form.codigoPostal && !/^\d{5}$/.test(form.codigoPostal)) {
       errors.codigoPostal = "El código postal debe tener 5 dígitos.";
@@ -259,6 +250,9 @@ export function CheckoutClient({ settings, savedAddresses = [] }: CheckoutClient
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitError(null);
+
+    // Guard against re-entry (double click / Enter) while a submit is in flight.
+    if (submitState === "loading") return;
 
     if (!validateForm()) return;
     if (!cartIsValid) {
@@ -279,6 +273,7 @@ export function CheckoutClient({ settings, savedAddresses = [] }: CheckoutClient
           price: item.price,
           quantity: item.quantity,
         })),
+        email: form.email,
         shippingName: form.nombre,
         shippingAddress: form.direccion,
         shippingCity: form.ciudad,
@@ -286,13 +281,17 @@ export function CheckoutClient({ settings, savedAddresses = [] }: CheckoutClient
         shippingPostalCode: form.codigoPostal,
         shippingPhone: form.telefono,
         notes: form.notas,
+        idempotencyKey,
       });
 
-      // Clear cart before redirecting to Stripe (order is saved in Payload).
+      // Clear cart before redirecting (order is saved in Payload).
       clear();
-      // If Stripe is configured, checkoutUrl is the Stripe-hosted checkout page.
-      // If not configured (local dev without keys), it falls back to /checkout/success.
-      window.location.href = result.checkoutUrl;
+      // The success page shows the order number + the "Enviar por WhatsApp"
+      // button that opens the pre-filled message to the store.
+      const tokenParam = result.guestToken
+        ? `&t=${encodeURIComponent(result.guestToken)}`
+        : "";
+      window.location.href = `/checkout/success?orderId=${encodeURIComponent(result.orderId)}${tokenParam}`;
     } catch (err) {
       setSubmitState("error");
       const msg = err instanceof Error ? err.message : "Error al procesar el pedido. Inténtalo de nuevo.";
@@ -328,6 +327,20 @@ export function CheckoutClient({ settings, savedAddresses = [] }: CheckoutClient
         </div>
       )}
 
+      {/* Guest notice — checkout works without an account */}
+      {isGuest && (
+        <div className="mb-6 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+          Puedes comprar como invitado. Si tienes cuenta,{" "}
+          <Link
+            href="/login?callbackUrl=/checkout"
+            className="font-medium text-foreground underline underline-offset-2"
+          >
+            inicia sesión
+          </Link>{" "}
+          para prellenar y guardar tus datos.
+        </div>
+      )}
+
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           {/* ----------------------------------------------------------------
@@ -356,10 +369,10 @@ export function CheckoutClient({ settings, savedAddresses = [] }: CheckoutClient
                   autoComplete="email"
                 />
                 <FormField
-                  id="telefono" label="Teléfono" type="tel"
+                  id="telefono" label="Celular" required type="tel"
                   value={form.telefono} error={fieldErrors.telefono}
                   onChange={(v) => handleField("telefono", v)}
-                  placeholder="+52 55 1234 5678 (opcional)"
+                  placeholder="55 1234 5678"
                   autoComplete="tel"
                 />
               </div>
@@ -504,12 +517,13 @@ export function CheckoutClient({ settings, savedAddresses = [] }: CheckoutClient
               </div>
             )}
 
-            {/* Payment notice */}
-            <div className="flex items-start gap-2.5 rounded-lg border border-blue-500/30 bg-blue-500/5 px-4 py-3 text-sm text-blue-700 dark:text-blue-400">
+            {/* WhatsApp notice */}
+            <div className="flex items-start gap-2.5 rounded-lg border border-green-500/30 bg-green-500/5 px-4 py-3 text-sm text-green-700 dark:text-green-400">
               <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
               <span>
-                Serás redirigido a <strong>Stripe</strong> para completar el pago
-                de forma segura. Tu orden se registra antes del pago.
+                Tu orden se registra y luego te mostramos un botón para
+                <strong> enviar tu pedido por WhatsApp</strong>. Ahí coordinamos
+                el pago (transferencia o en tienda) y la entrega.
               </span>
             </div>
 
@@ -522,12 +536,12 @@ export function CheckoutClient({ settings, savedAddresses = [] }: CheckoutClient
               {submitState === "loading" ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Preparando pago…
+                  Generando pedido…
                 </>
               ) : (
                 <>
                   <CheckCircle2 className="h-4 w-4" />
-                  Continuar al pago
+                  Continuar por WhatsApp
                 </>
               )}
             </Button>

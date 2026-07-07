@@ -19,8 +19,21 @@ import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import Facebook from "next-auth/providers/facebook";
 import NeonAdapter from "@auth/neon-adapter";
-import { Pool } from "@neondatabase/serverless";
+import { Pool, neonConfig } from "@neondatabase/serverless";
 import { verifyPassword } from "@/lib/auth/password";
+
+// ---------------------------------------------------------------------------
+// LOCAL DEV ONLY — route the Neon WebSocket driver through a local wsproxy
+// (scripts/dev/neon-wsproxy.ts) so Auth.js can talk to a plain local Postgres.
+// Opt-in via NEON_LOCAL_WSPROXY=host:port; never active in production.
+// ---------------------------------------------------------------------------
+if (process.env.NEON_LOCAL_WSPROXY && process.env.NODE_ENV !== "production") {
+  const proxy = process.env.NEON_LOCAL_WSPROXY;
+  neonConfig.wsProxy = (host, port) => `${proxy}/v1?address=${host}:${port}`;
+  neonConfig.useSecureWebSocket = false;
+  neonConfig.pipelineTLS = false;
+  neonConfig.pipelineConnect = false;
+}
 
 // ---------------------------------------------------------------------------
 // Guard — exported so helpers and Server Actions can reuse it
