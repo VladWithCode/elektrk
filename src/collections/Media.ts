@@ -1,6 +1,62 @@
-import type { CollectionConfig } from "payload";
+import type { CollectionConfig, CollectionAfterChangeHook, CollectionAfterDeleteHook, PayloadRequest } from "payload";
+import { revalidatePath } from "next/cache";
 import { isAdmin } from "../lib/payload-access";
 import { guardMediaDelete } from "../lib/payload-delete-guards";
+
+// ---------------------------------------------------------------------------
+// Revalidate storefront pages that reference a media file
+//
+// Detail pages (/products/[slug]) are statically prerendered. When a media file
+// is re-uploaded, replaced, or soft-deleted without editing the product itself,
+// the product's afterChange hook never fires — so the detail page would keep
+// serving a stale image (or the "no image" placeholder). This finds every
+// product that references the media (gallery image, datasheet, or SEO image)
+// and revalidates its path.
+// ---------------------------------------------------------------------------
+
+async function revalidateProductsUsingMedia(
+  mediaId: string | number,
+  req: PayloadRequest,
+) {
+  try {
+    const result = await req.payload.find({
+      collection: "products",
+      where: {
+        or: [
+          { "images.image": { equals: mediaId } },
+          { datasheet: { equals: mediaId } },
+          { metaImage: { equals: mediaId } },
+        ],
+      },
+      depth: 0,
+      limit: 1000,
+      select: { slug: true },
+      req,
+    });
+    for (const product of result.docs) {
+      const slug = product.slug;
+      if (typeof slug === "string" && slug.trim()) {
+        revalidatePath(`/products/${slug}`);
+      }
+    }
+    revalidatePath("/products");
+    revalidatePath("/");
+  } catch {
+    // Best-effort: revalidatePath throws outside a Next request/render context
+    // (Payload CLI migrations/seeds), and a failed lookup must not break the
+    // media save. Safe to ignore.
+  }
+}
+
+const revalidateOnMediaChange: CollectionAfterChangeHook = async ({ doc, req }) => {
+  await revalidateProductsUsingMedia(doc.id, req);
+  return doc;
+};
+
+const revalidateOnMediaDelete: CollectionAfterDeleteHook = async ({ doc, req }) => {
+  await revalidateProductsUsingMedia(doc.id, req);
+  return doc;
+};
 
 export const Media: CollectionConfig = {
   slug: "media",
@@ -78,6 +134,8 @@ export const Media: CollectionConfig = {
         await guardMediaDelete(req, id);
       },
     ],
+    afterChange: [revalidateOnMediaChange],
+    afterDelete: [revalidateOnMediaDelete],
   },
   fields: [
     {

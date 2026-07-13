@@ -1,4 +1,5 @@
-import { type CollectionConfig, type CollectionAfterChangeHook, type CollectionBeforeChangeHook, type CollectionBeforeValidateHook, APIError } from "payload";
+import { type CollectionConfig, type CollectionAfterChangeHook, type CollectionAfterDeleteHook, type CollectionBeforeValidateHook, APIError } from "payload";
+import { revalidatePath } from "next/cache";
 import { isAdmin } from "../lib/payload-access";
 import { guardProductDelete } from "../lib/payload-delete-guards";
 import { guardUniqueSlug } from "../lib/payload-unique-guards";
@@ -140,6 +141,41 @@ const cascadeSoftDeleteToVariants: CollectionAfterChangeHook = async ({
 };
 
 // ---------------------------------------------------------------------------
+// afterChange / afterDelete hook — revalidate storefront pages
+//
+// Detail (/products/[slug]) and catalog (/products) pages are statically
+// generated. Without this, CMS edits (e.g. a newly uploaded product image)
+// would not appear until the next redeploy — the exact cause of products
+// rendering the "no image" placeholder despite having images in the CMS.
+// ---------------------------------------------------------------------------
+
+function revalidateStorefront(slugs: Array<string | null | undefined>) {
+  try {
+    for (const slug of new Set(slugs)) {
+      if (typeof slug === "string" && slug.trim()) {
+        revalidatePath(`/products/${slug}`);
+      }
+    }
+    revalidatePath("/products");
+    revalidatePath("/");
+  } catch {
+    // revalidatePath throws outside a Next request/render context
+    // (e.g. Payload CLI migrations/seeds). Safe to ignore there.
+  }
+}
+
+const revalidateOnChange: CollectionAfterChangeHook = ({ doc, previousDoc }) => {
+  // Include previousDoc.slug so a slug rename revalidates the old path too.
+  revalidateStorefront([doc?.slug, previousDoc?.slug]);
+  return doc;
+};
+
+const revalidateOnDelete: CollectionAfterDeleteHook = ({ doc }) => {
+  revalidateStorefront([doc?.slug]);
+  return doc;
+};
+
+// ---------------------------------------------------------------------------
 // Collection
 // ---------------------------------------------------------------------------
 
@@ -192,7 +228,8 @@ export const Products: CollectionConfig = {
         await guardProductDelete(req, id);
       },
     ],
-    afterChange: [createInitialVariantHook, cascadeSoftDeleteToVariants],
+    afterChange: [createInitialVariantHook, cascadeSoftDeleteToVariants, revalidateOnChange],
+    afterDelete: [revalidateOnDelete],
   },
   fields: [
     // -------------------------------------------------------------------------

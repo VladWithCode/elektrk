@@ -18,6 +18,15 @@ interface Props {
   params: Promise<{ slug: string }>;
 }
 
+// Detail pages are statically generated at build time (generateStaticParams).
+// Product data lives in the CMS, so without revalidation a product edited after
+// a deploy — e.g. an image uploaded later — keeps serving the stale build-time
+// snapshot and renders the "no image" placeholder. ISR regenerates the page in
+// the background; the Products collection also revalidates paths on every save
+// for near-instant updates.
+export const revalidate = 3600; // 1h safety net
+export const dynamicParams = true; // render slugs created after build on first request
+
 export async function generateStaticParams() {
   const slugs = await getAllProductSlugs();
   return slugs.map((slug) => ({ slug }));
