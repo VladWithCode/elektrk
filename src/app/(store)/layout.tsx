@@ -21,7 +21,9 @@ import { Footer } from "@/components/layout/Footer";
 import { AnnouncementBar } from "@/components/layout/AnnouncementBar";
 import { CartDrawer } from "@/components/cart/CartDrawer";
 import { SessionProvider } from "@/components/auth/SessionProvider";
+import { WhatsAppFloatButton } from "@/components/shared/WhatsAppFloatButton";
 import { getStoreSettings } from "@/lib/repositories/settings";
+import { buildWhatsAppUrl } from "@/lib/whatsapp/order-message";
 import Script from "next/script";
 
 const manropeHeading = Manrope({
@@ -74,6 +76,10 @@ export default async function StoreRootLayout({
   children: React.ReactNode;
 }>) {
   const settings = await getStoreSettings();
+  const whatsappUrl = buildWhatsAppUrl(
+    settings.whatsapp,
+    "Hola, tengo una pregunta sobre sus productos.",
+  );
 
   return (
     <html
@@ -104,6 +110,7 @@ export default async function StoreRootLayout({
                 shippingRate={settings.flatShippingRate}
                 taxIncluded={settings.taxIncludedByDefault}
               />
+              <WhatsAppFloatButton whatsappUrl={whatsappUrl} />
             </SessionProvider>
           </CartProvider>
         </ThemeProvider>
