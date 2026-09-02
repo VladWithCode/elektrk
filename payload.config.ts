@@ -30,9 +30,14 @@ import { importCatalogEndpoints } from "./src/endpoints/import-catalog";
 const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
 
+// Trailing slash here would silently break cookie auth on POST/PATCH/DELETE:
+// Payload's CSRF origin check (extractJWT) compares this value byte-for-byte
+// against the browser's `Origin` header, which never has a trailing slash.
+const serverURL = (process.env.NEXT_PUBLIC_SERVER_URL || "http://localhost:3000").replace(/\/+$/, "");
+
 export default buildConfig({
-  serverURL: process.env.NEXT_PUBLIC_SERVER_URL || "http://localhost:3000",
-  cors: [process.env.NEXT_PUBLIC_SERVER_URL || "http://localhost:3000"],
+  serverURL,
+  cors: [serverURL],
   email: resendAdapter({
     defaultFromAddress: "onboarding@resend.dev",
     defaultFromName: "Distribuidor Electrico Monterrey Admin",
